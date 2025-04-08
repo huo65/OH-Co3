@@ -102,7 +102,6 @@ export struct MindSpore {
     'Clock', 'Song', 'Jersey', 'Stairs', 'Flap',
     'Jewellery', 'Bridge', 'Cuisine', 'Bread', 'Caving',
     'Shell', 'Wreath', 'Roof', 'Cookie', 'Canoe'];
-  @State imageToBeClassified : Resource = $r('app.media.plant')
 
   // 当 Tabs 发生变化 && 页面显示 时（监听父组件的 currentIndex 和 isPageShow）
   onTabsChange() {
