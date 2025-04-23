@@ -11,7 +11,9 @@ export struct MindSpore {
   @Consume @Watch('onTabsChange') currentIndex: number
   @Consume @Watch('onTabsChange') isPageShow: boolean
   @State modelPredict: string = 'MindSporeLite推理';
-  @State modelName: string = 'mobilenetv2.ms';
+  @State modelName: string = 'mobilenetv2Android.ms';
+  // Andoid，正常运行但无法得到正确答案
+  // @State modelName: string = 'mobilenetv2Android.ms';
   @State modelInputHeight: number = 224;
   @State modelInputWidth: number = 224;
   @State uris: Array<string> = [];
