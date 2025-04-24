@@ -55,11 +55,11 @@ class SystemProfiler{
   }
   getCpuInfo() {
     this.ownInfo.cpuUsage = Number(testStatisticsApi.getCpu_stat_cpu().split(" ")[0]);
-    console.log("========Cpu_stat_cpu is ",this.ownInfo.cpuUsage)
+    // console.log("========Cpu_stat_cpu is ",this.ownInfo.cpuUsage)
   }
   getmemoryInfo(){
     this.ownInfo.memorySize =(1 - (Number(testStatisticsApi.getAvailableMem().split(" ")[0]) / Number(testStatisticsApi.getMemTotal().split(" ")[0]))) * 100
-    console.log("========availableMem is ",this.ownInfo.memorySize)
+    // console.log("========availableMem is ",this.ownInfo.memorySize)
   }
 
   // // 获取调试信息，CPU 占用率，内存

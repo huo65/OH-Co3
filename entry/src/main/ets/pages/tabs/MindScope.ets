@@ -1,9 +1,10 @@
-import modelPredict from '../../manager/Model';
 import { BusinessError } from '@ohos.base';
-import image from '@ohos.multimedia.image';
 import photoAccessHelper from '@ohos.file.photoAccessHelper';
-import resourceManager from '@ohos.resourceManager'
-import fileIo from '@ohos.file.fs';
+import { ModelManager } from '../../manager/ModelManager';
+interface PredictResult {
+  maxArray: number[];
+  maxIndexArray: number[];
+}
 // TODO 参照Android改进
 @Component
 export struct MindSpore {
@@ -11,7 +12,7 @@ export struct MindSpore {
   @Consume @Watch('onTabsChange') currentIndex: number
   @Consume @Watch('onTabsChange') isPageShow: boolean
   @State modelPredict: string = 'MindSporeLite推理';
-  @State modelName: string = 'mobilenetv2Android.ms';
+  @State modelName: string = 'mobilenetv2.ms';
   // Andoid，正常运行但无法得到正确答案
   // @State modelName: string = 'mobilenetv2Android.ms';
   @State modelInputHeight: number = 224;
@@ -113,186 +114,109 @@ export struct MindSpore {
       // this.getBatteryInfo()
     }
   }
+
+  private modelManager: ModelManager = new ModelManager();
+  @State isLoading: boolean = false;
+
   build() {
     Row() {
       Column() {
-        Text(this.modelPredict)
-          .focusable(true)
-          .fontSize(30)
-          .fontWeight(FontWeight.Bold)
-
-        // //图片显示
-        // Image(this.uris[0]).width(320).height(540).margin(15)
-        //显示分类最大值
-        if (this.max) {
-          Text(this.labelsNameMmap[this.maxIndexArray[0]] +
-            ': ' +
-          (this.maxArray[0] / 100).toString() +
-            '%\n' +
-          this.labelsNameMmap[this.maxIndexArray[1]] +
-            ': ' +
-          (this.maxArray[1] / 100).toString() +
-            '%\n' +
-          this.labelsNameMmap[this.maxIndexArray[2]] +
-            ': ' +
-          (this.maxArray[2] / 100).toString() +
-            '%\n' +
-          this.labelsNameMmap[this.maxIndexArray[3]] +
-            ': ' +
-          (this.maxArray[3] / 100).toString() +
-            '%').focusable(true).fontSize(20)
+        if (this.isLoading) {
+          LoadingProgress()
+            .width(50)
+            .height(50)
+            .margin(20)
         }
 
+        // 优化后的图片预览区域
+        if (this.uris[0]) {
+          Image(this.uris[0])
+            .width(300)
+            .height(300)
+            .margin(15)
+            .borderRadius(16)
+            .overlay('rgba(0,0,0,0.04)')
+        }
+
+        // 优化后的结果展示卡片
+        if (this.maxArray && this.maxArray.length > 0) {
+          Column() {
+            ForEach(this.maxIndexArray, (item: number, index: number) => {
+              Row() {
+                Text(this.labelsNameMmap[item])
+                  .fontSize(18)
+                  .layoutWeight(1)
+                Progress({
+                  value: this.maxArray[index] / 100,
+                  total: 100,
+                  type: ProgressType.Linear
+                })
+                  .width(150)
+                  .margin({ left: 10 })
+                Text(`${(this.maxArray[index] / 100).toFixed(2)}%`)
+                  .fontSize(16)
+              }.margin({ bottom: 8 })
+            })
+          }
+          .width('90%')
+          .padding(20)
+          .backgroundColor(Color.White)
+          .margin({ top: 20 })
+          .borderRadius(12)
+          .shadow({ radius: 8, color: 'rgba(0,0,0,0.1)', offsetX: 2, offsetY: 2 })
+        }
+
+        // 优化后的按钮样式
         Button() {
-          Text('photo')
-            .fontSize(30)
-            .fontWeight(FontWeight.Bold)
+          Text('选择图片')
+            .fontSize(20)
+            .fontColor(Color.White)
         }
         .type(ButtonType.Capsule)
-        .margin({
-          top: 20
-        })
+        .width(200)
+        .height(50)
+        .margin(20)
         .backgroundColor('#0D9FFB')
-        .width('40%')
-        .height('5%')
-        .onClick(() => {
-          let resMgr: resourceManager.ResourceManager = getContext().getApplicationContext().resourceManager;
-          resMgr.getRawFileContent(this.modelName).then(modelBuffer => {
-
-            //获取相册图片
-            //1.创建图片-视频类型文件选择选项实例
-            let photoSelectOptions = new photoAccessHelper.PhotoSelectOptions();
-
-            //2.选择媒体文件类型和选择媒体文件的最大数目
-            photoSelectOptions.MIMEType = photoAccessHelper.PhotoViewMIMETypes.IMAGE_TYPE; // 过滤选择媒体文件类型为IMAGE
-            photoSelectOptions.maxSelectNumber = 1; // 选择媒体文件的最大数目
-
-            //3.创建图库选择器实例，调用select()接口拉起图库界面进行文件选择。文件选择成功后，返回 photoSelectResult 结果集。
-            let photoPicker = new photoAccessHelper.PhotoViewPicker();
-            photoPicker.select(photoSelectOptions, async (
-              err: BusinessError, photoSelectResult: photoAccessHelper.PhotoSelectResult) => {
-              if (err) {
-                console.error('MS_LITE_ERR: PhotoViewPicker.select failed with err: ' + JSON.stringify(err));
-                return;
-              }
-              console.info('MS_LITE_LOG: PhotoViewPicker.select successfully, ' +
-                'photoSelectResult uri: ' + JSON.stringify(photoSelectResult));
-              this.uris = photoSelectResult.photoUris;
-              console.info('MS_LITE_LOG: uri: ' + this.uris);
-
-              // 预处理图片数据
-              try {
-                // 1.使用fileIo.openSync接口，通过uri打开这个文件得到fd
-                let file = fileIo.openSync(this.uris[0], fileIo.OpenMode.READ_ONLY);
-                console.info('MS_LITE_LOG: file fd: ' + file.fd);
-
-                // 2.通过fd使用fileIo.readSync接口读取这个文件内的数据
-                let inputBuffer = new ArrayBuffer(4096000);
-                let readLen = fileIo.readSync(file.fd, inputBuffer);
-                console.info('MS_LITE_LOG: readSync data to file succeed and inputBuffer size is:' + readLen);
-
-                // 3.通过 PixelMap 预处理
-                let imageSource = image.createImageSource(file.fd);
-                let pixelMap = await imageSource.createPixelMap();
-                let info = await pixelMap.getImageInfo();
-                console.info('MS_LITE_LOG: info.width = ' + info.size.width);
-                console.info('MS_LITE_LOG: info.height = ' + info.size.height);
-
-                // 4.获取图片buffer数据readBuffer，并进行处理
-                pixelMap.scale(256.0 / info.size.width, 256.0 / info.size.height).then(() => {
-                  pixelMap.crop(
-                    { x: 16, y: 16, size: { height: this.modelInputHeight, width: this.modelInputWidth } }
-                  ).then(async () => {
-                    let info = await pixelMap.getImageInfo();
-                    console.info('MS_LITE_LOG: crop info.width = ' + info.size.width);
-                    console.info('MS_LITE_LOG: crop info.height = ' + info.size.height);
-
-                    //需要创建的像素buffer大小
-                    let readBuffer = new ArrayBuffer(this.modelInputHeight * this.modelInputWidth * 4);
-                    await pixelMap.readPixelsToBuffer(readBuffer);
-                    console.info('MS_LITE_LOG: Succeeded in reading image pixel data, buffer: ' +
-                    readBuffer.byteLength);
-
-                    //处理readBuffer
-                    const imageArr = new Uint8Array(
-                      readBuffer.slice(0, this.modelInputHeight * this.modelInputWidth * 4));
-                    console.info('MS_LITE_LOG: imageArr length: ' + imageArr.length);
-
-                    let means = [0.485, 0.456, 0.406];
-                    let stds = [0.229, 0.224, 0.225];
-                    let float32View = new Float32Array(this.modelInputHeight * this.modelInputWidth * 3);
-                    let index = 0;
-                    for (let i = 0; i < imageArr.length; i++) {
-                      if ((i + 1) % 4 == 0) {
-                        float32View[index] = (imageArr[i - 3] / 255.0 - means[0]) / stds[0]; // B
-                        float32View[index+1] = (imageArr[i - 2] / 255.0 - means[1]) / stds[1]; // G
-                        float32View[index+2] = (imageArr[i - 1] / 255.0 - means[2]) / stds[2]; // R
-                        index += 3;
-                      }
-                    }
-                    console.info('MS_LITE_LOG: float32View length: ' + float32View.length);
-                    let printStr = 'float32View data:';
-                    for (let i = 0; i < 20; i++) {
-                      printStr += ' ' + float32View[i];
-                    }
-                    console.info('MS_LITE_LOG: float32View data: ' + printStr);
-
-                    let inputs: ArrayBuffer[] = [float32View.buffer];
-
-                    // predict
-                    modelPredict(modelBuffer.buffer.slice(0), inputs).then(outputs => {
-                      console.info('=========MS_LITE_LOG: MS_LITE predict success=====');
-
-                      // 结果打印
-                      for (let i = 0; i < outputs.length; i++) {
-                        let out = new Float32Array(outputs[i].getData());
-
-                        let printStr = outputs[i].name + ':';
-                        for (let j = 0; j < out.length; j++) {
-                          printStr += out[j].toString() + ',';
-                        }
-                        console.info('MS_LITE_LOG: ' + printStr);
-
-                        // 取分类最大值top5
-                        this.max = 0;
-                        this.maxIndex = 0;
-                        this.maxArray = [];
-                        this.maxIndexArray = [];
-                        let newArray = out.filter(value => value !== this.max)
-                        for (let n = 0; n < 5; n++) {
-                          this.max = out[0];
-                          this.maxIndex = 0;
-                          // 取最大值
-                          for (let m = 0; m < newArray.length; m++) {
-                            if (newArray[m] > this.max) {
-                              this.max = newArray[m];
-                              this.maxIndex = m;
-                            }
-                          }
-                          this.maxArray.push(Math.round(this.max * 10000))
-                          this.maxIndexArray.push(this.maxIndex)
-                          // filter函数 数组过滤函数
-                          newArray = newArray.filter(value => value !== this.max)
-                        }
-                        console.info('MS_LITE_LOG: max:' + this.maxArray);
-                        console.info('MS_LITE_LOG: maxIndex:' + this.maxIndexArray);
-                      }
-                      console.info('=========MS_LITE_LOG END=========');
-                    })
-                  })
-                })
-
-                // 5.关闭文件
-                fileIo.closeSync(file)
-              } catch (err) {
-                console.error('MS_LITE_LOG: uri: open file fd failed.' + err)
-              }
-            })
-          })
+        .onClick(async () => {
+          this.isLoading = true
+          try {
+            await this.modelManager.initModel(this.modelName)
+            const result = await this.handleImageSelection()
+            this.maxArray = result.maxArray
+            this.maxIndexArray = result.maxIndexArray
+          } catch (err) {
+            console.error('处理失败:', err)
+          }
+          this.isLoading = false
         })
       }
-      .width('100%')
     }
-    .height('100%')
+  }
+
+  private async handleImageSelection(): Promise<PredictResult> {
+    return new Promise((resolve, reject) => {
+      let photoSelectOptions = new photoAccessHelper.PhotoSelectOptions();
+      photoSelectOptions.MIMEType = photoAccessHelper.PhotoViewMIMETypes.IMAGE_TYPE;
+      photoSelectOptions.maxSelectNumber = 1;
+      let photoPicker = new photoAccessHelper.PhotoViewPicker();
+      
+      photoPicker.select(photoSelectOptions, async (err: BusinessError, photoSelectResult: photoAccessHelper.PhotoSelectResult) => {
+        if (err) {
+          console.error('MS_LITE_ERR: PhotoViewPicker.select failed with err: ' + JSON.stringify(err));
+          reject(err);
+          return;
+        }
+
+        try {
+          this.uris = photoSelectResult.photoUris;
+          const processedImage = await this.modelManager.processImage(this.uris[0]);
+          const predictResult = await this.modelManager.predictWithTopResults([processedImage]);
+          console.info('=========MS_LITE_LOG END=========');
+          resolve(predictResult);
+        } catch (e) {
+          reject(e);
+        }
+      });
+    });
   }
 }

@@ -8,7 +8,12 @@ export default async function modelPredict(
   //1.创建上下文
   let context: mindSporeLite.Context = {};
   context.target = ['cpu'];
-  context.cpu = {}
+  // 修改上下文配置
+  context.cpu = {
+    threadNum: 1, // 减少线程数
+    threadAffinityMode: 0, // 改为默认模式
+    precisionMode: 'enforce_fp32'
+  };
   context.cpu.threadNum = 2;
   context.cpu.threadAffinityMode = 1;
   context.cpu.precisionMode = 'enforce_fp32';
