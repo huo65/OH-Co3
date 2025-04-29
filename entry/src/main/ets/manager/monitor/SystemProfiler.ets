@@ -3,7 +3,7 @@ import hidebug from '@ohos.hidebug';
 import deviceInfo from '@ohos.deviceInfo';
 import statfs from '@ohos.file.statvfs';
 import HashMap from '@ohos.util.HashMap';
-import {scheduler} from './Scheduler'
+import {scheduler} from '../scheduler/Scheduler'
 import testStatisticsApi from 'libentry.so';
 
 export class NodeInfo{

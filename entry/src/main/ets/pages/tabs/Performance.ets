@@ -1,5 +1,5 @@
 import router from '@ohos.router';
-import { NodeInfo, systemProfiler } from '../../manager/SystemProfiler';
+import { NodeInfo, systemProfiler } from '../../manager/monitor/SystemProfiler';
 import List from '@ohos.util.List';
 import { SelectTitleBar } from "@ohos.arkui.advanced.SelectTitleBar"
 import HashMap from '@ohos.util.HashMap';

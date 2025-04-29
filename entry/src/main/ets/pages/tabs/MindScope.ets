@@ -1,6 +1,6 @@
 import { BusinessError } from '@ohos.base';
 import photoAccessHelper from '@ohos.file.photoAccessHelper';
-import { ModelManager } from '../../manager/ModelManager';
+import { ModelManager } from '../../manager/worker/ModelManager';
 interface PredictResult {
   maxArray: number[];
   maxIndexArray: number[];

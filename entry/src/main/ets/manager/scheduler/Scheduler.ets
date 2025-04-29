@@ -1,5 +1,5 @@
 import HashMap from '@ohos.util.HashMap';
-import { NodeInfo, systemProfiler } from './SystemProfiler';
+import { NodeInfo, systemProfiler } from '../monitor/SystemProfiler';
 
 class Scheduler{
 
