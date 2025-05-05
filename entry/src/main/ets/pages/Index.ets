@@ -1,5 +1,7 @@
 import { Performance } from './tabs/Performance'
 import {MindSpore} from './tabs/MindScope'
+import { MQTT } from './tabs/MQTT'
+
 // import {MQTT} from './Tabs/MQTT'
 // C:\Users\86132\AppData\Local\Huawei\Sdk\hmscore\emulator
 // Emulator –hvd Huawei_Phone
@@ -55,7 +57,7 @@ struct Index {
       .tabBar(this.TabBuilder('推理', 1, $r('app.media.tl'), $r('app.media.tl2')))
 
       TabContent() {
-        // MQTT()
+        MQTT()
       }
       .tabBar(this.TabBuilder('通信', 2, $r('app.media.app_icon'), $r('app.media.app_icon')))
     }
