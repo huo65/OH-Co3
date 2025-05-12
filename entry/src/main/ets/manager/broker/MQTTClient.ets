@@ -59,6 +59,14 @@ class MQTTClient {
     await this.subscribe() // 订阅主题
     this.messageArrived() // 监听订阅主题
   }
+  public isCon() {
+    if (this.mqttClient != null) {
+      return this.mqttClient.isConnected()
+    }else {
+      return false
+    }
+
+  }
 
   // 创建mqtt实例
   public createMqttClient() {

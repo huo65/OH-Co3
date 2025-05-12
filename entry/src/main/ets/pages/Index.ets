@@ -1,6 +1,7 @@
 import { Performance } from './tabs/Performance'
 import {MindSpore} from './tabs/MindScope'
 import { MQTT } from './tabs/MQTT'
+import { MqttClientScreen } from './tabs/Broker'
 
 // import {MQTT} from './Tabs/MQTT'
 // C:\Users\86132\AppData\Local\Huawei\Sdk\hmscore\emulator
@@ -11,6 +12,8 @@ struct Index {
   // @Provide 装饰器和 @Consume装饰器：与后代组件双向同步
   @Provide currentIndex: number = 0
   @Provide isPageShow: boolean = false
+
+
   @StorageLink('bottomHeight') bottomHeight: number = 0
 
   onPageShow() {
@@ -57,7 +60,8 @@ struct Index {
       .tabBar(this.TabBuilder('推理', 1, $r('app.media.tl'), $r('app.media.tl2')))
 
       TabContent() {
-        MQTT()
+        // MQTT()
+        MqttClientScreen()
       }
       .tabBar(this.TabBuilder('通信', 2, $r('app.media.app_icon'), $r('app.media.app_icon')))
     }
@@ -67,6 +71,3 @@ struct Index {
   }
 }
 
-function MindScope() {
-  throw new Error('Function not implemented.');
-}
