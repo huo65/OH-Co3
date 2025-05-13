@@ -1,12 +1,10 @@
 import batteryInfo from '@ohos.batteryInfo';
-import hidebug from '@ohos.hidebug';
 import deviceInfo from '@ohos.deviceInfo';
 import statfs from '@ohos.file.statvfs';
 import HashMap from '@ohos.util.HashMap';
 import {scheduler} from '../scheduler/Scheduler'
 import testStatisticsApi from 'libentry.so';
-import List from '@ohos.util.List';
-import ArrayList from '@ohos.util.ArrayList';
+import { nodeInfoSyn } from '../broker/monitor/NodeInfoSyn';
 
 export class NodeInfo{
   // 设备产品名称
@@ -36,10 +34,10 @@ class SystemProfiler{
   ownInfo:NodeInfo = new NodeInfo();
 
   getOtherInfo(){
-
+    nodeInfoSyn.getOtherNodeInfo()
   }
-  getInfo(){
-    this.getDeviceInfo()
+  getOwnInfo(){
+    this.getDeviceName()
     this.getCpuInfo()
     this.getmemoryInfo()
     this.getStatfsInfo()
@@ -49,7 +47,7 @@ class SystemProfiler{
     return this.deviceInfos
   }
   // 获取设备产品名称
-  getDeviceInfo() {
+  getDeviceName() {
     this.ownInfo.deviceName = deviceInfo.marketName
   }
   getCpuInfo() {

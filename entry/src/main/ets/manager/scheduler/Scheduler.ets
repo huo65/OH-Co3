@@ -5,7 +5,7 @@ class Scheduler{
 
   private deviceInfos:HashMap<string,NodeInfo> = new HashMap();
   workScheduler(){
-    this.deviceInfos = systemProfiler.getInfo()
+    this.deviceInfos = systemProfiler.getOwnInfo()
 
   }
 

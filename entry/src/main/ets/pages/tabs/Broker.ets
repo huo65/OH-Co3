@@ -8,7 +8,7 @@ const MQTTOption: MQTTOptionsType = {
   topic: 'topic1',
   qos: 1
 }
-const MQTTInstance: MQTTClient = MQTTClient.getInstance(MQTTOption)
+const MQTTInstance: MQTTClient = MQTTClient.getFirstInstance(MQTTOption)
 // 定义一个简单的MQTT客户端组件
 @Component
 @Preview
@@ -65,10 +65,16 @@ export struct  MqttClientScreen {
           if (this.connectionStatus == "Disconnected") {
             Text("Connect").fontSize(20)
               .fontColor(Color.White)
+              .onClick(()=>{
+                MQTTInstance.init()
+              })
 
           } else {
             Text("Disconnect").fontSize(20)
               .fontColor(Color.White)
+              .onClick(()=>{
+                MQTTInstance.destroy()
+              })
           }
         }
         .type(ButtonType.Capsule)
@@ -76,9 +82,9 @@ export struct  MqttClientScreen {
         .height(50)
         .margin(20)
         .backgroundColor('#0D9FFB')
-        .onClick(() => {
-          MQTTInstance.destroy()
-        })
+        // .onClick(() => {
+        //
+        // })
 
 
         Text('status: ' + this.connectionStatus)
