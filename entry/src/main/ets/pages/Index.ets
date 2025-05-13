@@ -1,7 +1,7 @@
-import { Performance } from './tabs/Performance'
-import {MindSpore} from './tabs/MindScope'
+import { Performance } from './tabs/PerformanceScreen'
+import {MindSpore} from './tabs/MindScopeScreen'
 import { MQTT } from './tabs/MQTT'
-import { MqttClientScreen } from './tabs/Broker'
+import { MqttClientScreen } from './tabs/BrokerScreen'
 
 // import {MQTT} from './Tabs/MQTT'
 // C:\Users\86132\AppData\Local\Huawei\Sdk\hmscore\emulator
