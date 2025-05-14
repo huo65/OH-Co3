@@ -25,13 +25,12 @@ export struct  MqttClientScreen {
   // @State receiveMsg: string = ''
   // @State sendMsg: string = ''
   //监听收到的消息
-  onPageShow(): void {
+  aboutToAppear(): void {
     emitter.on({
       eventId: EVENTID
     }, (data) => {
       let message:string = JSON.stringify(data)
       this.receiveMsg.push(message)
-      console.info("huohuo@@@@@@@")
     });
   }
 
