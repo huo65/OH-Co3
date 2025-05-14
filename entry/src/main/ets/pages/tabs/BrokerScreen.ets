@@ -1,17 +1,10 @@
 
 import { MQTTClient, MQTTOptionsType, EVENTID } from '../../manager/broker/MQTTClient'
 import emitter from '@ohos.events.emitter';
+import { MQTTOption } from '../../manager/broker/MQTTConfig';
 
-const MQTTOption: MQTTOptionsType = {
-  url: 'mqtt://192.168.87.159:1883',
-  clientId: 'mqtt123456@',
-  userName: 'root',
-  password: 'admin',
-  topic: '/test/123',
-  qos: 1
-}
 
-const MQTTInstance: MQTTClient = MQTTClient.getInstance(MQTTOption)
+const MQTTInstance: MQTTClient = MQTTClient.getFirstInstance(MQTTOption)
 // 定义一个简单的MQTT客户端组件
 @Component
 @Preview
@@ -26,6 +19,7 @@ export struct  MqttClientScreen {
   // @State sendMsg: string = ''
   //监听收到的消息
   aboutToAppear(): void {
+    MQTTInstance.subscribeTopic("/device/list")
     emitter.on({
       eventId: EVENTID
     }, (data) => {

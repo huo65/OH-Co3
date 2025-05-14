@@ -43,6 +43,7 @@ class SystemProfiler{
     this.getStatfsInfo()
     this.getBatteryInfo()
     this.getScore()
+    nodeInfoSyn.sendOwnInfo()
     this.deviceInfos.set(this.ownInfo.deviceName,this.ownInfo)
     return this.deviceInfos
   }

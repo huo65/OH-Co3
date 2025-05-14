@@ -45,10 +45,14 @@ class MQTTClient {
   }
 
   // 静态方法获取唯一实例
-  public static getInstance(mqttOptions: MQTTOptionsType): MQTTClient {
+  public static getFirstInstance(mqttOptions: MQTTOptionsType): MQTTClient {
     if (!MQTTClient.instance) {
       MQTTClient.instance = new MQTTClient(mqttOptions)
     }
+    return MQTTClient.instance
+  }
+  // 静态方法获取唯一实例
+  public static getInstance(): MQTTClient {
     return MQTTClient.instance
   }
 
@@ -56,7 +60,7 @@ class MQTTClient {
   async init() {
     this.createMqttClient() // 创建mqtt实例
     await this.connectMqtt() // 连接服务器
-    await this.subscribe() // 订阅主题
+    await this.subscribeBaseTopic() // 订阅主题
     this.messageArrived() // 监听订阅主题
   }
 
@@ -92,12 +96,29 @@ class MQTTClient {
   }
 
   // 订阅主题
-  public async subscribe() {
+  public async subscribeBaseTopic() {
     if (!this.mqttClient) {
       return
     }
     let subscribeOption: MqttSubscribeOptions = {
       topic: this.topic,
+      qos: this.qos as MqttQos
+    }
+    await this.mqttClient.subscribe(subscribeOption).then((res: MqttResponse) => {
+      console.info('MQTT订阅主题成功：', JSON.stringify(res.message))
+    }).catch((err: Error) => {
+      console.error('MQTT订阅主题失败：', JSON.stringify(err))
+    })
+    // 监听订阅主题
+    this.messageArrived()
+  }
+  // 订阅主题
+  public async subscribeTopic(topic:string) {
+    if (!this.mqttClient) {
+      return
+    }
+    let subscribeOption: MqttSubscribeOptions = {
+      topic: topic,
       qos: this.qos as MqttQos
     }
     await this.mqttClient.subscribe(subscribeOption).then((res: MqttResponse) => {
