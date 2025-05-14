@@ -7,11 +7,9 @@ const MQTTOption: MQTTOptionsType = {
   clientId: 'mqtt123456@',
   userName: 'root',
   password: 'admin',
-  topic: 'topic1',
+  topic: '/test/123',
   qos: 1
 }
-
-
 
 const MQTTInstance: MQTTClient = MQTTClient.getInstance(MQTTOption)
 // 定义一个简单的MQTT客户端组件
@@ -24,17 +22,18 @@ export struct  MqttClientScreen {
   @State sendMsg: string = ''
   @State receiveMsg: Array<string> = [];
 
-
-  aboutToAppear(): void {
-    // MQTTInstance.subscribe()
-    // 监听 EVENTID 事件以获取 payload
-
-    emitter.on(EVENTID.toString(), (data) => {
-      const payload = data.data;
-      console.info('获取到的 payload: ', payload);
+  // @State receiveMsg: string = ''
+  // @State sendMsg: string = ''
+  //监听收到的消息
+  onPageShow(): void {
+    emitter.on({
+      eventId: EVENTID
+    }, (data) => {
+      let message:string = JSON.stringify(data)
+      this.receiveMsg.push(message)
+      console.info("huohuo@@@@@@@")
     });
   }
-
 
   build() {
     Scroll() {
@@ -119,4 +118,5 @@ export struct  MqttClientScreen {
     .scrollBarWidth(10)
     .edgeEffect(EdgeEffect.Spring)
   }
+
 }
