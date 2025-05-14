@@ -34,7 +34,7 @@ class SystemProfiler{
   ownInfo:NodeInfo = new NodeInfo();
 
   getOtherInfo(){
-    nodeInfoSyn.getOtherNodeInfo()
+    // nodeInfoSyn.getOtherNodeInfo()
   }
   getOwnInfo(){
     this.getDeviceName()

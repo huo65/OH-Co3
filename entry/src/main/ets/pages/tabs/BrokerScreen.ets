@@ -1,51 +1,41 @@
 
 import { MQTTClient, MQTTOptionsType, EVENTID } from '../../manager/broker/MQTTClient'
+import emitter from '@ohos.events.emitter';
+
 const MQTTOption: MQTTOptionsType = {
-  url: 'mqtt://broker.emqx.io:1883',
+  url: 'mqtt://192.168.87.159:1883',
   clientId: 'mqtt123456@',
   userName: 'root',
   password: 'admin',
   topic: 'topic1',
   qos: 1
 }
-const MQTTInstance: MQTTClient = MQTTClient.getFirstInstance(MQTTOption)
+
+
+
+const MQTTInstance: MQTTClient = MQTTClient.getInstance(MQTTOption)
 // 定义一个简单的MQTT客户端组件
 @Component
 @Preview
 export struct  MqttClientScreen {
-  brokerUrl: string = 'tcp://10.198.162.191:1883';
+  brokerUrl: string = 'tcp://broker.emqx.io:1883';
   connectionStatus: string = 'Disconnected';
   @State title: string = 'MQTT客户端';
   @State sendMsg: string = ''
-  @State receiveMsg: Array<string> = [];  // 新增日志状态
-  // private nodeInfoSyn: NodeInfoSyn = NodeInfoSyn.getInstance(); // 假设NodeInfoSyn是一个单例类
-  // private taskDispatch: TaskDispatch = TaskDispatch.getInstance(); // 假设TaskDispatch是一个单例类
-  //
-  // async onConnectClick() {
-  //   if (this.connectionStatus === 'Disconnected') {
-  //     try {
-  //       await MQTTInstance.isCon();
-  //       this.connectionStatus = 'Connected';
-  //       this.subscribeTopics();
-  //     } catch (error) {
-  //       this.connectionStatus = 'Connection Failed';
-  //     }
-  //   } else {
-  //     this.mqttClient.disconnect();
-  //     this.connectionStatus = 'Disconnected';
-  //   }
-  // }
-  //
-  // subscribeTopics() {
-  //   this.mqttClient.subscribe('/test/123', (topic, payload) => {
-  //     const message = new TextDecoder('utf-8').decode(payload);
-  //     console.log(`Received [${topic}]:${message}`);
-  //     // 处理消息
-  //   });
-  //   // 订阅其他主题...
-  // }
+  @State receiveMsg: Array<string> = [];
 
-  // UI渲染方法
+
+  aboutToAppear(): void {
+    // MQTTInstance.subscribe()
+    // 监听 EVENTID 事件以获取 payload
+
+    emitter.on(EVENTID.toString(), (data) => {
+      const payload = data.data;
+      console.info('获取到的 payload: ', payload);
+    });
+  }
+
+
   build() {
     Scroll() {
       Column({ space: 24 }) {

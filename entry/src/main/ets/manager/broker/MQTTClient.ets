@@ -8,7 +8,7 @@ import {
 } from '@ohos/mqtt';
 import emitter from '@ohos.events.emitter';
 
-//  ohpm install @ohos/mqtt@2.0.12
+
 // 事件id
 const EVENTID = 1001
 
@@ -44,15 +44,11 @@ class MQTTClient {
     this.init()
   }
 
-  // 静态方法初次获取唯一实例
-  public static getFirstInstance(mqttOptions: MQTTOptionsType): MQTTClient {
+  // 静态方法获取唯一实例
+  public static getInstance(mqttOptions: MQTTOptionsType): MQTTClient {
     if (!MQTTClient.instance) {
       MQTTClient.instance = new MQTTClient(mqttOptions)
     }
-    return MQTTClient.instance
-  }
-  // 静态方法获取唯一实例
-  public static getInstance(): MQTTClient {
     return MQTTClient.instance
   }
 
@@ -62,14 +58,6 @@ class MQTTClient {
     await this.connectMqtt() // 连接服务器
     await this.subscribe() // 订阅主题
     this.messageArrived() // 监听订阅主题
-  }
-  public isCon() {
-    if (this.mqttClient != null) {
-      return this.mqttClient.isConnected()
-    }else {
-      return false
-    }
-
   }
 
   // 创建mqtt实例
@@ -92,6 +80,10 @@ class MQTTClient {
       connectTimeout: 30, // 设置连接超时时间，默认
       automaticReconnect: true, // 是否在连接丢失的情况下自动重新连接
       MQTTVersion: 0, // 设置要在连接上使用的MQTT版本， 0=默认值：从3.1.1开始，如果失败，则返回到3.1，3=仅尝试版本3.1，4=仅尝试3.1.1版本
+      // sslOptions:{
+      //   enableServerCertAuth: true, // 是否开启服务端证书认证，默认为false
+      //    trustStore: fileDir + "/ca.crt" // CA证书的沙箱路径
+      // }
     }).then((res: MqttResponse) => {
       console.info('MQTT服务器连接连接成功：' + JSON.stringify(res.message))
     }).catch((err: Error) => {

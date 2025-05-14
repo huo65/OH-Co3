@@ -1,6 +1,5 @@
 import { Performance } from './tabs/PerformanceScreen'
 import {MindSpore} from './tabs/MindScopeScreen'
-import { MQTT } from './tabs/MQTT'
 import { MqttClientScreen } from './tabs/BrokerScreen'
 
 // import {MQTT} from './Tabs/MQTT'
