@@ -32,6 +32,20 @@
           }
         ]
       }
-    ]
+    ],
+    "requestPermissions": [
+      {
+        "name": "ohos.permission.GET_WIFI_INFO"
+      },
+      {
+        "name": "ohos.permission.LOCATION"
+      },
+      {
+        "name": "ohos.permission.ACCESS_BLUETOOTH"
+      },
+      {
+        "name": "ohos.permission.INTERNET",
+      }
+    ],
   }
 }
