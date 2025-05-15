@@ -10,20 +10,20 @@ export class NodeInfo{
   // 设备产品名称
   deviceName: string
   // 电池电量百分比
-  batteryState: number
+  batteryLevel: number
   // 内存占用
-  memorySize: number
+  memoryUsage: number
   // CPU 占用率
   cpuUsage: number
-  statfsFreeSize: number
+  storageFree: number
   score:number
 
   constructor() {
     this.deviceName = "";
-    this.batteryState = 0;
-    this.memorySize = 0;
+    this.batteryLevel = 0;
+    this.memoryUsage = 0;
     this.cpuUsage = 0;
-    this.statfsFreeSize = 0;
+    this.storageFree = 0;
     this.score = 0;
   }
 
@@ -43,7 +43,7 @@ class SystemProfiler{
     this.getStatfsInfo()
     this.getBatteryInfo()
     this.getScore()
-    nodeInfoSyn.sendOwnInfo()
+    nodeInfoSyn.sendOwnInfo(this.ownInfo)
     this.deviceInfos.set(this.ownInfo.deviceName,this.ownInfo)
     return this.deviceInfos
   }
@@ -55,19 +55,19 @@ class SystemProfiler{
     this.ownInfo.cpuUsage = Number(testStatisticsApi.getCpu_stat_cpu().split(" ")[0]);
   }
   getmemoryInfo(){
-    this.ownInfo.memorySize =(1 - (Number(testStatisticsApi.getAvailableMem().split(" ")[0]) / Number(testStatisticsApi.getMemTotal().split(" ")[0]))) * 100
+    this.ownInfo.memoryUsage =(1 - (Number(testStatisticsApi.getAvailableMem().split(" ")[0]) / Number(testStatisticsApi.getMemTotal().split(" ")[0]))) * 100
   }
 
   getStatfsInfo() {
     const context = getContext()
-    this.ownInfo.statfsFreeSize = statfs.getFreeSizeSync(context.filesDir) / (1000 * 1000 * 1000)
+    this.ownInfo.storageFree = statfs.getFreeSizeSync(context.filesDir) / (1000 * 1000 * 1000)
   }
 
   getBatteryInfo() {
-    this.ownInfo.batteryState = batteryInfo.batterySOC
+    this.ownInfo.batteryLevel = batteryInfo.batterySOC
   }
   getScore(){
-    this.ownInfo.score = scheduler.calculate_score(this.ownInfo.batteryState,this.ownInfo.memorySize,this.ownInfo.cpuUsage,this.ownInfo.statfsFreeSize)
+    this.ownInfo.score = scheduler.calculate_score(this.ownInfo.batteryLevel,this.ownInfo.memoryUsage,this.ownInfo.cpuUsage,this.ownInfo.storageFree)
   }
 
 }

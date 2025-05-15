@@ -12,8 +12,25 @@ class NodeInfoSyn{
   // getOtherNodeInfo(): List<NodeInfo>{
   //   return ;
   // }
-  sendOwnInfo(){
-    MQTTInstance.pushMessage("testsend" as string,"/deviceInfo/" as string,1 as MqttQos)
+  sendOwnInfo(nodeInfo: NodeInfo): void {
+    this.ownName = nodeInfo.deviceName;
+    // TODO score
+
+    const message: string = `
+    {
+        "deviceName": "${nodeInfo.deviceName}",
+        "score": "${nodeInfo.score}",
+        "params": {
+            "deviceName": "${nodeInfo.deviceName}",
+            "cpuUsage": ${nodeInfo.cpuUsage},
+            "memoryUsage": ${nodeInfo.memoryUsage},
+            "storageFree": ${nodeInfo.storageFree},
+            "batteryLevel": ${nodeInfo.batteryLevel}
+        }
+    }
+    `.trim();
+
+    MQTTInstance.pushMessage(message,"/device/status");
   }
 
 }

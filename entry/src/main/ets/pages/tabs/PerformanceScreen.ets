@@ -31,7 +31,7 @@ export struct Performance {
     this.updateInfo()
     setInterval(() => {
       this.updateInfo()
-    }, 5000);
+    }, 10000);
   }
 
   // 当 Tabs 发生变化 && 页面显示 时（监听父组件的 currentIndex 和 isPageShow）
@@ -54,10 +54,10 @@ export struct Performance {
   showInfo(index:number){
     this.deviceName =  this.deviceNames[index].value.toString()
     let info:NodeInfo = this.deviceInfos.get(this.deviceName)
-    this.batteryState = info.batteryState
-    this.memorySize = info.memorySize
+    this.batteryState = info.batteryLevel
+    this.memorySize = info.memoryUsage
     this.cpuUsage = info.cpuUsage
-    this.statfsFreeSize = info.statfsFreeSize
+    this.statfsFreeSize = info.storageFree
   }
 
   // 标题行
