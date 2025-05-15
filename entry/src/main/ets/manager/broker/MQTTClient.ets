@@ -55,6 +55,13 @@ class MQTTClient {
   public static getInstance(): MQTTClient {
     return MQTTClient.instance
   }
+  public async isCon(): Promise<boolean> {
+    if (!this.mqttClient) {
+      return false;
+    } else {
+      return this.mqttClient.isConnected();
+    }
+  }
 
   // 初始化方法
   async init() {

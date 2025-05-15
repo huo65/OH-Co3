@@ -10,7 +10,7 @@ const MQTTInstance: MQTTClient = MQTTClient.getFirstInstance(MQTTOption)
 @Preview
 export struct  MqttClientScreen {
   brokerUrl: string = 'tcp://broker.emqx.io:1883';
-  connectionStatus: string = 'Disconnected';
+  @State connectionStatus: string = 'Disconnected';
   @State title: string = 'MQTT客户端';
   @State sendMsg: string = ''
   @State receiveMsg: Array<string> = [];
@@ -19,13 +19,31 @@ export struct  MqttClientScreen {
   // @State sendMsg: string = ''
   //监听收到的消息
   aboutToAppear(): void {
+    setInterval(() => {
+      this.checkConnectionStatus()
+      this.receiveMsg.pop()
+    }, 5000);
     MQTTInstance.subscribeTopic("/device/list")
+    MQTTInstance.subscribeTopic("/device/status")
     emitter.on({
       eventId: EVENTID
     }, (data) => {
       let message:string = JSON.stringify(data)
       this.receiveMsg.push(message)
     });
+  }
+  public async checkConnectionStatus() {
+    try {
+      const isConnected = await MQTTInstance.isCon();
+      if (isConnected) {
+        this.connectionStatus = 'Connected';
+      } else {
+        this.connectionStatus = 'Disconnected';
+      }
+    } catch (error) {
+      console.error("Failed to check connection status:", error);
+      this.connectionStatus = 'Error';
+    }
   }
 
   build() {
@@ -70,6 +88,12 @@ export struct  MqttClientScreen {
 
 
         Text('status: ' + this.connectionStatus)
+          .fontColor(
+            this.connectionStatus === 'Connected' ? '#00FF00' :
+              this.connectionStatus === 'Disconnected' ? '#FF0000' :
+                  '#ffee044e'
+          );
+
 
         Row({ space: 16 }) {
           TextInput({ text: $$this.sendMsg, placeholder: '请填写需要发送的消息' })
