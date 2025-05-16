@@ -1,7 +1,15 @@
 
-import { MQTTClient, MQTTOptionsType, EVENTID } from '../../manager/broker/MQTTClient'
+import { MQTTClient, EVENTID} from '../../manager/broker/MQTTClient'
 import emitter from '@ohos.events.emitter';
 import { MQTTOption } from '../../manager/broker/MQTTConfig';
+import { nodeInfoSyn } from '../../manager/broker/monitor/NodeInfoSyn';
+interface DataPass {
+  data:string;
+}
+interface RealDataPass {
+  topic: string,
+  content: string;
+}
 
 
 const MQTTInstance: MQTTClient = MQTTClient.getFirstInstance(MQTTOption)
@@ -21,16 +29,27 @@ export struct  MqttClientScreen {
   aboutToAppear(): void {
     setInterval(() => {
       this.checkConnectionStatus()
-      this.receiveMsg.pop()
+      this.receiveMsg.shift()
     }, 5000);
-    MQTTInstance.subscribeTopic("/device/list")
-    MQTTInstance.subscribeTopic("/device/status")
+    MQTTInstance.subscribeTopic(["/device/list","/device/status"])
     emitter.on({
       eventId: EVENTID
     }, (data) => {
       let message:string = JSON.stringify(data)
+      let dataMessage:DataPass = JSON.parse(message)
+      let realData:string = JSON.stringify(dataMessage.data)
+      let realMessage:RealDataPass = JSON.parse(realData)
+      if (realMessage.topic == "/device/status") {
+        nodeInfoSyn.parseNodeInfoMessage(realMessage.content);
+      }
       this.receiveMsg.push(message)
     });
+    // emitter.on({
+    //   eventId: STATUS
+    // }, (data) => {
+    //   let message:string = JSON.stringify(data)
+    //   nodeInfoSyn.parseNodeInfoMessage(message);
+    // });
   }
   public async checkConnectionStatus() {
     try {

@@ -11,8 +11,7 @@ import emitter from '@ohos.events.emitter';
 
 // 事件id
 const EVENTID = 1001
-
-
+const STATUS = 1002
 interface MQTTOptionsType {
   url?: string
   clientId?: string
@@ -112,23 +111,28 @@ class MQTTClient {
       qos: this.qos as MqttQos
     }
     await this.mqttClient.subscribe(subscribeOption).then((res: MqttResponse) => {
-      console.info('MQTT订阅主题成功：', JSON.stringify(res.message))
+      console.info('MQTTbase订阅主题成功：', JSON.stringify(res.message),subscribeOption.topic)
     }).catch((err: Error) => {
       console.error('MQTT订阅主题失败：', JSON.stringify(err))
     })
     // 监听订阅主题
     this.messageArrived()
   }
-  // 订阅主题
-  public async subscribeTopic(topic:string) {
+  // 订阅需要的所有主题
+  public async subscribeTopic(topics:string[]) {
     if (!this.mqttClient) {
       return
     }
-    let subscribeOption: MqttSubscribeOptions = {
-      topic: topic,
-      qos: this.qos as MqttQos
+    let subscribeOptions: MqttSubscribeOptions[] = []
+    for (let index = 0; index < topics.length; index++) {
+      let subscribeOption: MqttSubscribeOptions = {
+        topic: topics[index],
+        qos: this.qos as MqttQos
+      }
+      subscribeOptions.push(subscribeOption)
     }
-    await this.mqttClient.subscribe(subscribeOption).then((res: MqttResponse) => {
+
+    await this.mqttClient.subscribeMany(subscribeOptions).then((res: MqttResponse) => {
       console.info('MQTT订阅主题成功：', JSON.stringify(res.message))
     }).catch((err: Error) => {
       console.error('MQTT订阅主题失败：', JSON.stringify(err))
@@ -148,13 +152,24 @@ class MQTTClient {
         console.error('MQTT接收消息失败：', JSON.stringify(err))
       } else {
         console.info('MQTT接收消息成功：', JSON.stringify(data))
+        // if (data.topic == "/device/status") {
+        //   emitter.emit({
+        //     eventId: STATUS,
+        //     priority: emitter.EventPriority.LOW // 表示事件优于IDLE优先级投递，事件的默认优先级是LOW。
+        //   }, {
+        //     data: {
+        //       content: data.payload,
+        //     }
+        //   })
+        // }
         // 发送消息至线程
         emitter.emit({
           eventId: EVENTID,
           priority: emitter.EventPriority.LOW // 表示事件优于IDLE优先级投递，事件的默认优先级是LOW。
         }, {
           data: {
-            content: data.payload,
+            topic: data.topic,
+            content: data.payload
           }
         })
       }
@@ -176,7 +191,7 @@ class MQTTClient {
       qos: qo,
       payload: msg
     }).then((data: MqttResponse) => {
-      console.info("MQTT消息发送成功：", JSON.stringify(data))
+      console.info("MQTT消息发送成功：", JSON.stringify(data),pic)
     }).catch((err: Error) => {
       console.error("MQTT消息发送失败：", JSON.stringify(err))
     })
@@ -199,6 +214,4 @@ class MQTTClient {
   }
 }
 
-export {
-  MQTTClient, EVENTID, MQTTOptionsType
-}
+export { MQTTClient, EVENTID, MQTTOptionsType, STATUS };
