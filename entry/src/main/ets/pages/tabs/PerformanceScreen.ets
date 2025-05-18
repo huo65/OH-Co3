@@ -22,7 +22,8 @@ export struct Performance {
   @State cpuUsage: number = 0
   @State statfsFreeSize: number = 0
   @State deviceInfos:HashMap<string,NodeInfo> = new HashMap();
-  @State deviceNames:Array<SelectOption> = [{value:"Lenovo TB-J607F"},{value:"OpenHarmony 3.2"}];
+  // https://docs.openharmony.cn/pages/v4.1/zh-cn/application-dev/quick-start/arkts-state.md {value:"Lenovo TB-J607F"},{value:"OpenHarmony 3.2"}
+  @State deviceNames:SelectOption[] = [{value:"Lenovo TB-J607F"},{value:"OpenHarmony 3.2"}];
   @State isRefreshing: boolean = false
 
   aboutToAppear() {
