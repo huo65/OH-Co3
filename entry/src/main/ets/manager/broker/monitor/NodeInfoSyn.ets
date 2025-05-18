@@ -1,6 +1,8 @@
 import { NodeInfo } from '../../monitor/SystemProfiler'
 import { MQTTClient } from '../MQTTClient'
 import {MQTTOption} from '../MQTTConfig'
+import List from '@ohos.util.List'
+import HashMap from '@ohos.util.HashMap'
 
 const MQTTInstance: MQTTClient = MQTTClient.getFirstInstance(MQTTOption)
 interface NodeInfoObj {
@@ -10,12 +12,18 @@ interface NodeInfoObj {
 }
 
 class NodeInfoSyn{
-  ownName:String = "OpenHarmony"
+  ownName:String = "OpenHarmony 3.2"
   otherNodeInfo:NodeInfo[] = [];
 
-  // getOtherNodeInfo(): List<NodeInfo>{
-  //   return ;
-  // }
+
+  getOtherNodeInfo():HashMap<string,NodeInfo> {
+    let otherInfo:HashMap<string,NodeInfo> = new HashMap<string,NodeInfo>();
+    for (let index = 0; index < this.otherNodeInfo.length; index++) {
+      otherInfo.set(this.otherNodeInfo[index].deviceName,this.otherNodeInfo[index])
+    }
+    return otherInfo;
+  }
+
   sendOwnInfo(nodeInfo: NodeInfo): void {
     this.ownName = nodeInfo.deviceName;
     // TODO score

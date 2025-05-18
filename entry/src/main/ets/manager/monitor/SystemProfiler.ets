@@ -32,11 +32,34 @@ export class NodeInfo{
 class SystemProfiler{
   private deviceInfos:HashMap<string,NodeInfo> = new HashMap();
   ownInfo:NodeInfo = new NodeInfo();
+  getDeviceInfos():HashMap<string,NodeInfo>{
+  //   合并两个HashMap：getOtherInfo()+getOwnInfo()
+    // 获取其他设备信息
+    let otherInfo:HashMap<string,NodeInfo> = this.getOtherInfo();
+    // 获取本设备信息
+    let ownInfo:HashMap<string,NodeInfo> = this.getOwnInfo();
 
-  getOtherInfo(){
-    // nodeInfoSyn.getOtherNodeInfo()
+    // 创建一个新的 Map 来存储合并后的信息
+    let  combinedInfo:HashMap<string,NodeInfo> = new HashMap<string, NodeInfo>();
+
+    // 将其他设备信息添加到 combinedInfo
+    otherInfo.forEach((value, key) => {
+      combinedInfo.set(key, value);
+    });
+
+    // 将本设备信息添加到 combinedInfo
+    ownInfo.forEach((value, key) => {
+      combinedInfo.set(key, value);
+    });
+
+    return combinedInfo;
   }
-  getOwnInfo(){
+
+  getOtherInfo():HashMap<string,NodeInfo>{
+    return nodeInfoSyn.getOtherNodeInfo()
+  }
+
+  getOwnInfo():HashMap<string,NodeInfo>{
     this.getDeviceName()
     this.getCpuInfo()
     this.getmemoryInfo()

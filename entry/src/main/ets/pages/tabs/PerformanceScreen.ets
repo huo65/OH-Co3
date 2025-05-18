@@ -43,7 +43,7 @@ export struct Performance {
     }
   }
   updateInfo(){
-    this.deviceInfos = systemProfiler.getOwnInfo()
+    this.deviceInfos = systemProfiler.getDeviceInfos()
     this.nameList.clear()
     for (const key of this.deviceInfos.keys()) {
       let nodeName:SelectOption = {value:key}
