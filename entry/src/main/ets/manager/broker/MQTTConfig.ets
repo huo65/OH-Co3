@@ -1,7 +1,7 @@
 import { MQTTClient, MQTTOptionsType } from './MQTTClient'
 
 export const MQTTOption: MQTTOptionsType = {
-  url: 'mqtt://192.168.87.159:1883',
+  url: 'mqtt://192.168.99.159:1883',
   clientId: 'mqtt123456@',
   userName: 'root',
   password: 'admin',

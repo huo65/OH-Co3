@@ -1,7 +1,6 @@
 import { NodeInfo } from '../../monitor/SystemProfiler'
 import { MQTTClient } from '../MQTTClient'
 import {MQTTOption} from '../MQTTConfig'
-import List from '@ohos.util.List'
 import HashMap from '@ohos.util.HashMap'
 
 const MQTTInstance: MQTTClient = MQTTClient.getFirstInstance(MQTTOption)
@@ -62,26 +61,25 @@ class NodeInfoSyn{
   parseNodeInfoMessage(message:string){
     try {
       const nodeInfoObj:NodeInfoObj = JSON.parse(message);
-      const deviceName:string = nodeInfoObj.deviceName;
-      const score:number = nodeInfoObj.score;
+      const newDeviceName:string = nodeInfoObj.deviceName;
+      const newScore:number = nodeInfoObj.score;
 
-      if (this.ownName !== deviceName) {
+      if (this.ownName !== newDeviceName) {
         const params:NodeInfo = nodeInfoObj.params;
-        const nodeInfo: NodeInfo = {
-          deviceName: deviceName,
+        const newNodeInfo: NodeInfo = {
+          deviceName: newDeviceName,
           cpuUsage: parseFloat(params.cpuUsage.toFixed(2)),
           memoryUsage: parseFloat(params.memoryUsage.toFixed(2)),
           storageFree: parseFloat(params.storageFree.toFixed(2)),
           batteryLevel: parseFloat(params.batteryLevel.toFixed(2)),
-          score: parseFloat(score.toFixed(2))
+          score: newScore
         };
-        console.log("huoADD:" + deviceName);
-
         // Remove existing entry with the same device name if exists
-        this.otherNodeInfo = this.otherNodeInfo.filter(node => node.deviceName !== deviceName);
+        this.otherNodeInfo = this.otherNodeInfo.filter(node => node.deviceName !== newDeviceName);
+        console.log("huoADD:" + newDeviceName);
 
         // Add new node info
-        this.otherNodeInfo.push(nodeInfo);
+        this.otherNodeInfo.push(newNodeInfo);
       } else {
         console.log("huoNO");
       }
