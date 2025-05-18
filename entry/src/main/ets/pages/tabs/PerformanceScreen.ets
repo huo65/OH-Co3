@@ -1,9 +1,7 @@
 import router from '@ohos.router';
 import { NodeInfo, systemProfiler } from '../../manager/monitor/SystemProfiler';
-import List from '@ohos.util.List';
 import { SelectTitleBar } from "@ohos.arkui.advanced.SelectTitleBar"
 import HashMap from '@ohos.util.HashMap';
-import promptAction from '@ohos.promptAction';
 
 
 interface UsageItem {
@@ -24,7 +22,7 @@ export struct Performance {
   @State cpuUsage: number = 0
   @State statfsFreeSize: number = 0
   @State deviceInfos:HashMap<string,NodeInfo> = new HashMap();
-  @State deviceNames:Array<SelectOption> = new Array();
+  @State deviceNames:Array<SelectOption> = [{value:"Lenovo TB-J607F"},{value:"OpenHarmony 3.2"}];
   @State isRefreshing: boolean = false
 
   aboutToAppear() {
@@ -37,27 +35,27 @@ export struct Performance {
   // 当 Tabs 发生变化 && 页面显示 时（监听父组件的 currentIndex 和 isPageShow）
   onTabsChange() {
     if (this.currentIndex === 2 && this.isPageShow === true) {
-      // this.getDebugInfo()
-      // this.getStatfsInfo()
-      // this.getBatteryInfo()
+
     }
   }
   updateInfo(){
     this.deviceInfos = systemProfiler.getDeviceInfos()
-    this.deviceNames = []
-    for (const key of this.deviceInfos.keys()) {
-      let nodeNameOption:SelectOption = {value:key}
-      this.deviceNames.push(nodeNameOption)
-      console.log("updateHuoADD:" + nodeNameOption.value);
-    }
-    console.log("updateHuoADD:");
+    // this.deviceNames = []
+    // for (const key of this.deviceInfos.keys()) {
+    //   let nodeNameOption:SelectOption = {value:key}
+    //   this.deviceNames.push(nodeNameOption)
+    //   console.log("updateHuoADD:" + nodeNameOption.value);
+    // }
+    // console.log("updateHuoADD:");
   }
   showInfo(nameChoose:string){
     let info:NodeInfo = this.deviceInfos.get(nameChoose)
-    this.batteryState = info.batteryLevel
-    this.memorySize = info.memoryUsage
-    this.cpuUsage = info.cpuUsage
-    this.statfsFreeSize = info.storageFree
+    if (info) {
+      this.batteryState = info.batteryLevel
+      this.memorySize = info.memoryUsage
+      this.cpuUsage = info.cpuUsage
+      this.statfsFreeSize = info.storageFree
+    }
   }
 
   // 标题行
@@ -113,6 +111,18 @@ export struct Performance {
             },
             hidesBackButton: true
           })
+        // test
+        // Divider().height(2).color(0xCCCCCC)
+        // SelectTitleBar({
+        //   options: [
+        //     { value: '所有照片' },
+        //     { value: '本地（设备）' },
+        //     { value: '本地本地本地本地本地（储存卡）' }
+        //   ],
+        //   selected: 0,
+        //   onSelected: (index) => promptAction.showToast({ message: 'page index ' + index }),
+        //   hidesBackButton: true
+        // })
 
 
         // 硬件信息
