@@ -3,6 +3,7 @@ import { NodeInfo, systemProfiler } from '../../manager/monitor/SystemProfiler';
 import List from '@ohos.util.List';
 import { SelectTitleBar } from "@ohos.arkui.advanced.SelectTitleBar"
 import HashMap from '@ohos.util.HashMap';
+import promptAction from '@ohos.promptAction';
 
 
 interface UsageItem {
@@ -18,14 +19,13 @@ export struct Performance {
   // @Provide 装饰器和 @Consume 装饰器：与后代组件双向同步
   @Consume @Watch('onTabsChange') currentIndex: number
   @Consume @Watch('onTabsChange') isPageShow: boolean
-  @State deviceName: string = ''
   @State batteryState: number = 0
   @State memorySize: number = 0
   @State cpuUsage: number = 0
   @State statfsFreeSize: number = 0
   @State deviceInfos:HashMap<string,NodeInfo> = new HashMap();
   @State deviceNames:Array<SelectOption> = new Array();
-  nameList:List<SelectOption> = new List();
+  @State isRefreshing: boolean = false
 
   aboutToAppear() {
     this.updateInfo()
@@ -44,16 +44,16 @@ export struct Performance {
   }
   updateInfo(){
     this.deviceInfos = systemProfiler.getDeviceInfos()
-    this.nameList.clear()
+    this.deviceNames = []
     for (const key of this.deviceInfos.keys()) {
-      let nodeName:SelectOption = {value:key}
-      this.nameList.add(nodeName)
+      let nodeNameOption:SelectOption = {value:key}
+      this.deviceNames.push(nodeNameOption)
+      console.log("updateHuoADD:" + nodeNameOption.value);
     }
-    this.deviceNames =  this.nameList.convertToArray()
+    console.log("updateHuoADD:");
   }
-  showInfo(index:number){
-    this.deviceName =  this.deviceNames[index].value.toString()
-    let info:NodeInfo = this.deviceInfos.get(this.deviceName)
+  showInfo(nameChoose:string){
+    let info:NodeInfo = this.deviceInfos.get(nameChoose)
     this.batteryState = info.batteryLevel
     this.memorySize = info.memoryUsage
     this.cpuUsage = info.cpuUsage
@@ -62,7 +62,7 @@ export struct Performance {
 
   // 标题行
   @Builder
-  TitleRow(title = '', target = '') {
+  TitleRow(title = '') {
     Row() {
       Text(title)
         .fontSize(18)
@@ -105,20 +105,20 @@ export struct Performance {
   build() {
     Scroll() {
       Column() {
-        SelectTitleBar({
-          options:this.deviceNames,
-          selected: 0,
-          // onSelected: (index) => promptAction.showToast({ message: 'page index ' + index }),
-          onSelected: (index): number => setInterval(() => {
-            this.showInfo(index)
-          }, 5000),
-          hidesBackButton: true
-        })
+          SelectTitleBar({
+            options: this.deviceNames,
+            selected: 0,
+            onSelected: (index: number): void => {
+              this.showInfo(this.deviceNames[index].value.toString());
+            },
+            hidesBackButton: true
+          })
+
 
         // 硬件信息
         Column() {
           // 标题
-          this.TitleRow(this.deviceName, 'pages/Hardware/HardwareIndexPage')
+          // this.TitleRow(this.chooseDeviceName)
           // GridRow 布局 可以看作是 Grid 布局
           GridRow({ columns: 3, gutter: 10 }) {
             GridCol() {
@@ -153,7 +153,7 @@ export struct Performance {
 
         // 电池管家
         Column() {
-          this.TitleRow('电池管家', 'pages/Battery/BatteryIndexPage')
+          this.TitleRow('电池管家')
           Column() {
             Row() {
               Text(`电池剩余${this.batteryState}%`)
