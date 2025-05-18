@@ -31,7 +31,7 @@ export struct  MqttClientScreen {
       this.checkConnectionStatus()
       this.receiveMsg.shift()
     }, 5000);
-    MQTTInstance.subscribeTopic(["/device/list","/device/status"])
+    MQTTInstance.subscribeTopic(["/device/list","/device/status","task/assign","task/result"])
     emitter.on({
       eventId: EVENTID
     }, (data) => {
