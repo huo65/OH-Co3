@@ -28,11 +28,16 @@ export class ModelManager {
   private modelBuffer: ArrayBuffer = new ArrayBuffer(0);
   private modelInputHeight: number = 224;
   private modelInputWidth: number = 224;
+  private isInit: Boolean = false;
 
   async initModel(modelName: string): Promise<void> {
+    if (this.isInit) {
+      return
+    }
     const resMgr = getContext().getApplicationContext().resourceManager;
     const rawFileContent: Uint8Array = await resMgr.getRawFileContent(modelName);
     this.modelBuffer = rawFileContent.buffer as ArrayBuffer;  // 添加类型断言
+    this.isInit = true;
 }
 
   async processImage(uri: string): Promise<ArrayBuffer> {
