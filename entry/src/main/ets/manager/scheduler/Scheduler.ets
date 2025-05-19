@@ -2,11 +2,19 @@ import HashMap from '@ohos.util.HashMap';
 import { NodeInfo, systemProfiler } from '../monitor/SystemProfiler';
 
 class Scheduler{
+  private static SchedulerInstance: Scheduler
+
 
   private deviceInfos:HashMap<string,NodeInfo> = new HashMap();
   workScheduler(){
-    this.deviceInfos = systemProfiler.getOwnInfo()
+    this.deviceInfos = systemProfiler.getDeviceInfos()
 
+  }
+  public static getInstance(): Scheduler {
+    if (!Scheduler.SchedulerInstance) {
+      Scheduler.SchedulerInstance = new Scheduler()
+    }
+    return Scheduler.SchedulerInstance
   }
 
   calculate_score(batteryState: number,memorySize: number,cpuUsage: number,statfsFreeSize: number){
@@ -14,4 +22,4 @@ class Scheduler{
     return score;
   }
 }
-export const scheduler = new Scheduler()
+export { Scheduler };

@@ -2,7 +2,6 @@ import batteryInfo from '@ohos.batteryInfo';
 import deviceInfo from '@ohos.deviceInfo';
 import statfs from '@ohos.file.statvfs';
 import HashMap from '@ohos.util.HashMap';
-import {scheduler} from '../scheduler/Scheduler'
 import testStatisticsApi from 'libentry.so';
 import { nodeInfoSyn } from '../broker/monitor/NodeInfoSyn';
 
@@ -90,7 +89,7 @@ class SystemProfiler{
     this.ownInfo.batteryLevel = batteryInfo.batterySOC
   }
   getScore(){
-    this.ownInfo.score = scheduler.calculate_score(this.ownInfo.batteryLevel,this.ownInfo.memoryUsage,this.ownInfo.cpuUsage,this.ownInfo.storageFree)
+    // this.ownInfo.score = scheduler.calculate_score(this.ownInfo.batteryLevel,this.ownInfo.memoryUsage,this.ownInfo.cpuUsage,this.ownInfo.storageFree)
   }
 
 }

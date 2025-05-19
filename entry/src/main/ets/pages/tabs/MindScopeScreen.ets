@@ -1,10 +1,14 @@
 import { BusinessError } from '@ohos.base';
 import photoAccessHelper from '@ohos.file.photoAccessHelper';
 import { ModelManager } from '../../manager/worker/ModelManager';
+import { Scheduler} from '../../manager/scheduler/Scheduler';
+import systemDateTime from '@ohos.systemDateTime';
+
 interface PredictResult {
   maxArray: number[];
   maxIndexArray: number[];
 }
+const SchedulerInstance: Scheduler = Scheduler.getInstance();
 // TODO 参照Android改进
 @Component
 export struct MindSpore {
@@ -232,19 +236,34 @@ export struct MindSpore {
           return;
         }
         this.logMessages.push('[2/5] 已选择图片: ' + photoSelectResult.photoUris[0]);
+        let start:number = 0;
+        let end:number = 0;
+
+          systemDateTime.getCurrentTime(false, (error, time) => {
+            console.info(`Succeeded in getting currentTime : ${time}`);
+            start = time
+          });
+
         try {
           this.uris = photoSelectResult.photoUris;
           this.logMessages.push('[3/5] 开始图片预处理...');
           const processedImage = await this.modelManager.processImage(this.uris[0]);
           this.logMessages.push('[4/5] 开始模型推理...');
+
           const predictResult = await this.modelManager.predictWithTopResults([processedImage]);
           this.logMessages.push('[5/5] 推理完成');
+          systemDateTime.getCurrentTime(false, (error, time) => {
+            console.info(`Succeeded in getting currentTime : ${time}`);
+            end = time
+            console.info(`usetime : ${end - start}`);
+          });
           console.info('=========MS_LITE_LOG END=========');
           resolve(predictResult);
         } catch (e) {
           this.logMessages.push('[ERROR] 流程异常: ' + e.message);
           reject(e);
         }
+
       });
     });
   }

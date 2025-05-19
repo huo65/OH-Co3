@@ -1,6 +1,8 @@
 import image from '@ohos.multimedia.image';
 import fileIo from '@ohos.file.fs';
 import modelPredict from './Model';
+import util from '@ohos.util';
+
 
 // 在文件顶部添加类型定义
 interface ImageSize {
@@ -103,5 +105,21 @@ export class ModelManager {
       .sort((a, b) => b.val - a.val)
       .slice(0, count)
       .map(item => item.idx)
+  }
+
+
+
+  base64ToPixelMap(base64: string): Promise<image.PixelMap> {
+    //将原始图片base64字符串转变为通过base64字符串
+    const reg = new RegExp('data:image/\\w+;base64,');
+    const base64Str = base64.replace(reg, '');
+    //将通用base64字符串转变为arrayBuffer
+    let base64Helper = new util.Base64Helper();
+    let arrayBuffer = base64Helper.decodeSync(base64Str).buffer as ArrayBuffer;
+    //将arrayBuffer转变为pixelMap
+    let imageSource = image.createImageSource(arrayBuffer);
+    let opts: image.DecodingOptions = { editable: false }
+    //注意：这里return的是Promise，因此使用时需要在业务侧拿到最终的PixelMap
+    return imageSource.createPixelMap(opts);
   }
 }
