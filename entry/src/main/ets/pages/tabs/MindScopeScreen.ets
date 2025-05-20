@@ -224,7 +224,8 @@ export struct MindSpore {
 
   private async handleImageSelection(): Promise<PredictResult> {
     return new Promise((resolve, reject) => {
-      this.logMessages.push('[1/5] 开始选择图片...');
+      this.logMessages = []
+      this.logMessages.push('[1/6] 开始选择图片...');
       let photoSelectOptions = new photoAccessHelper.PhotoSelectOptions();
       photoSelectOptions.MIMEType = photoAccessHelper.PhotoViewMIMETypes.IMAGE_TYPE;
       photoSelectOptions.maxSelectNumber = 1;
@@ -236,44 +237,23 @@ export struct MindSpore {
           reject(err);
           return;
         }
-        this.logMessages.push('[2/5] 已选择图片: ' + photoSelectResult.photoUris[0]);
-        let start:number = 0;
-        let end:number = 0;
+        this.logMessages.push('[2/6] 已选择图片: ' + photoSelectResult.photoUris[0]);
+        if (SchedulerInstance.workScheduler(this.uris[0], this.logMessages)){
+          try {
+            this.uris = photoSelectResult.photoUris;
+            this.logMessages.push('[4/6] 本地执行开始图片预处理...');
+            const processedImage = await this.modelManager.processImage(this.uris[0]);
+            this.logMessages.push('[5/6] 开始模型推理...');
 
-          systemDateTime.getCurrentTime(false, (error, time) => {
-            console.info(`Succeeded in getting currentTime : ${time}`);
-            start = time
-          });
-
-        try {
-          this.uris = photoSelectResult.photoUris;
-
-          let taskInfo: TaskInfo = new TaskInfo()
-          taskInfo.taskId = "idhuo"
-          taskInfo.fromClientId = "oh"
-          taskInfo.toClientId = "Lenovo TB-J607F"
-          taskInfo.interTime = start.toString()
-          // let bitmap:Promise<string> =  this.modelManager.processImageTOBase64(this.uris[0])
-          taskInfo.params.bitmap = await this.modelManager.processImageTOBase64(this.uris[0])
-          taskDispatch.sendTask(taskInfo)
-          // this.logMessages.push('[3/5] 开始图片预处理...');
-          // const processedImage = await this.modelManager.processImage(this.uris[0]);
-          // this.logMessages.push('[4/5] 开始模型推理...');
-          //
-          // const predictResult = await this.modelManager.predictWithTopResults([processedImage]);
-          this.logMessages.push('[5/5] 推理完成');
-          systemDateTime.getCurrentTime(false, (error, time) => {
-            console.info(`Succeeded in getting currentTime : ${time}`);
-            end = time
-            console.info(`usetime : ${end - start}`);
-          });
-          console.info('=========MS_LITE_LOG END=========');
-          // resolve(predictResult);
-        } catch (e) {
-          this.logMessages.push('[ERROR] 流程异常: ' + e.message);
-          reject(e);
+            const predictResult = await this.modelManager.predictWithTopResults([processedImage]);
+            this.logMessages.push('[6/6] 推理完成');
+            console.info('=========MS_LITE_LOG END=========');
+            resolve(predictResult);
+          } catch (e) {
+            this.logMessages.push('[ERROR] 流程异常: ' + e.message);
+            reject(e);
+          }
         }
-
       });
     });
   }

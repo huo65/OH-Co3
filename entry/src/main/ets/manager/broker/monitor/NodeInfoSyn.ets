@@ -10,8 +10,9 @@ interface NodeInfoObj {
   params: NodeInfo
 }
 
+const ownName:String = "OpenHarmony 3.2"
 class NodeInfoSyn{
-  ownName:String = "OpenHarmony 3.2"
+
   otherNodeInfo:NodeInfo[] = [];
 
 
@@ -24,9 +25,6 @@ class NodeInfoSyn{
   }
 
   sendOwnInfo(nodeInfo: NodeInfo): void {
-    this.ownName = nodeInfo.deviceName;
-    // TODO score
-
     const message: string = `
     {
         "deviceName": "${nodeInfo.deviceName}",
@@ -64,7 +62,7 @@ class NodeInfoSyn{
       const newDeviceName:string = nodeInfoObj.deviceName;
       const newScore:number = nodeInfoObj.score;
 
-      if (this.ownName !== newDeviceName) {
+      if (ownName !== newDeviceName) {
         const params:NodeInfo = nodeInfoObj.params;
         const newNodeInfo: NodeInfo = {
           deviceName: newDeviceName,
@@ -93,3 +91,4 @@ class NodeInfoSyn{
 
 }
 export const nodeInfoSyn = new NodeInfoSyn();
+export {ownName}
