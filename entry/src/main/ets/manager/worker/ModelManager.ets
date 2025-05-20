@@ -2,6 +2,7 @@ import image from '@ohos.multimedia.image';
 import fileIo from '@ohos.file.fs';
 import modelPredict from './Model';
 import util from '@ohos.util';
+import buffer from '@ohos.buffer';
 
 
 // 在文件顶部添加类型定义
@@ -81,6 +82,44 @@ export class ModelManager {
     return float32View.buffer;
   }
 
+  async processImageTOBase64(uri: string): Promise<string> {
+    let file: fileIo.File | null = null;
+
+    try {
+      // 打开文件
+      file = fileIo.openSync(uri, fileIo.OpenMode.READ_ONLY);
+
+      // 创建图像源
+      const imageSource = image.createImageSource(file.fd);
+      const pixelMap = await imageSource.createPixelMap();
+
+      // 获取原始图像信息
+      const info = await pixelMap.getImageInfo();
+
+      // 缩放至最大宽度 512
+      const scale = Math.min(512 / info.size.width, 1);
+      await pixelMap.scale(scale, scale);
+
+      // 使用 ImagePacker 打包成 JPEG，设置压缩质量
+      const imagePackerApi: image.ImagePacker = image.createImagePacker();
+      const packOpts: image.PackingOption = { format: 'image/jpeg', quality: 70 };
+
+      const data: ArrayBuffer = await imagePackerApi.packing(pixelMap, packOpts);
+
+      // 转换为 Buffer 并生成 Base64
+      const buf: buffer.Buffer = buffer.from(data);
+      const base64 = buf.toString('base64', 0, buf.length);
+
+      return base64;
+    } catch (error) {
+      console.error("Error processing image to base64:", error);
+      return "";
+    } finally {
+      if (file) {
+        fileIo.closeSync(file);
+      }
+    }
+  }
 
   async predictWithTopResults(inputs: ArrayBuffer[]): Promise<PredictResult> {
     const outputs = await modelPredict(this.modelBuffer.slice(0), inputs)

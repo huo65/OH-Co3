@@ -5,14 +5,21 @@ interface TaskParams {
   bitmap?: string;
 }
 
-interface TaskInfo {
+
+class TaskInfo {
   taskId: string;
   fromClientId: string;
   toClientId: string;
   interTime: string;
   params: TaskParams;
+  constructor() {
+    this.taskId = "";
+    this.fromClientId = "";
+    this.toClientId = "";
+    this.interTime = "";
+    this.params = {};
+  }
 }
-
 class TaskDispatch{
   ownName:String = "OpenHarmony 3.2";
   async sendTask(taskInfo: TaskInfo): Promise<boolean> {
@@ -46,3 +53,4 @@ class TaskDispatch{
 
 }
 export const taskDispatch = new TaskDispatch();
+export {TaskInfo}

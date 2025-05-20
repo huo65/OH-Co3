@@ -3,6 +3,7 @@ import photoAccessHelper from '@ohos.file.photoAccessHelper';
 import { ModelManager } from '../../manager/worker/ModelManager';
 import { Scheduler} from '../../manager/scheduler/Scheduler';
 import systemDateTime from '@ohos.systemDateTime';
+import { taskDispatch, TaskInfo } from '../../manager/broker/task/TaskDispatch';
 
 interface PredictResult {
   maxArray: number[];
@@ -246,11 +247,20 @@ export struct MindSpore {
 
         try {
           this.uris = photoSelectResult.photoUris;
-          this.logMessages.push('[3/5] 开始图片预处理...');
-          const processedImage = await this.modelManager.processImage(this.uris[0]);
-          this.logMessages.push('[4/5] 开始模型推理...');
 
-          const predictResult = await this.modelManager.predictWithTopResults([processedImage]);
+          let taskInfo: TaskInfo = new TaskInfo()
+          taskInfo.taskId = "idhuo"
+          taskInfo.fromClientId = "oh"
+          taskInfo.toClientId = "Lenovo TB-J607F"
+          taskInfo.interTime = start.toString()
+          // let bitmap:Promise<string> =  this.modelManager.processImageTOBase64(this.uris[0])
+          taskInfo.params.bitmap = await this.modelManager.processImageTOBase64(this.uris[0])
+          taskDispatch.sendTask(taskInfo)
+          // this.logMessages.push('[3/5] 开始图片预处理...');
+          // const processedImage = await this.modelManager.processImage(this.uris[0]);
+          // this.logMessages.push('[4/5] 开始模型推理...');
+          //
+          // const predictResult = await this.modelManager.predictWithTopResults([processedImage]);
           this.logMessages.push('[5/5] 推理完成');
           systemDateTime.getCurrentTime(false, (error, time) => {
             console.info(`Succeeded in getting currentTime : ${time}`);
@@ -258,7 +268,7 @@ export struct MindSpore {
             console.info(`usetime : ${end - start}`);
           });
           console.info('=========MS_LITE_LOG END=========');
-          resolve(predictResult);
+          // resolve(predictResult);
         } catch (e) {
           this.logMessages.push('[ERROR] 流程异常: ' + e.message);
           reject(e);
