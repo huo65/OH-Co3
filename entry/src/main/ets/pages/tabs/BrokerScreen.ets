@@ -3,10 +3,10 @@ import { MQTTClient, EVENTID} from '../../manager/broker/MQTTClient'
 import emitter from '@ohos.events.emitter';
 import { MQTTOption } from '../../manager/broker/MQTTConfig';
 import { nodeInfoSyn } from '../../manager/broker/monitor/NodeInfoSyn';
-interface DataPass {
+export interface DataPass {
   data:string;
 }
-interface RealDataPass {
+export  interface RealDataPass {
   topic: string,
   content: string;
 }
@@ -22,10 +22,6 @@ export struct  MqttClientScreen {
   @State title: string = 'MQTT客户端';
   @State sendMsg: string = ''
   @State receiveMsg: Array<string> = [];
-
-  // @State receiveMsg: string = ''
-  // @State sendMsg: string = ''
-  //监听收到的消息
   aboutToAppear(): void {
     setInterval(() => {
       this.checkConnectionStatus()
@@ -44,12 +40,7 @@ export struct  MqttClientScreen {
       }
       this.receiveMsg.push(message)
     });
-    // emitter.on({
-    //   eventId: STATUS
-    // }, (data) => {
-    //   let message:string = JSON.stringify(data)
-    //   nodeInfoSyn.parseNodeInfoMessage(message);
-    // });
+
   }
   public async checkConnectionStatus() {
     try {

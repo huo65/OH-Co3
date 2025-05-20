@@ -1,10 +1,19 @@
+import { ownName } from '../monitor/NodeInfoSyn';
 import { MQTTClient } from '../MQTTClient'
 import {MQTTOption} from '../MQTTConfig'
 const MQTTInstance: MQTTClient = MQTTClient.getFirstInstance(MQTTOption)
 interface TaskParams {
   bitmap?: string;
 }
-
+interface TaskResultObj{
+  taskId: string,
+  fromClient:string,
+  toClient:string,
+  params:ResultInfo
+}
+interface ResultInfo{
+  result:string
+}
 
 class TaskInfo {
   taskId: string;
@@ -45,9 +54,29 @@ class TaskDispatch{
   sendTaskResult(){
 
   }
-  parseResultMessage(){
-
+  /**
+   *             {
+   "taskId": "idhuo",
+   "fromClient": "oh",
+   "toClient": "Lenovo TB-J607F",
+   "params": {
+   "result": "识别成功 (45ms)
+   Plant: 66%
+   Pattern: 50%
+   Vacation : 50%"
+   }
+   }
+   * @param message
+   */
+  parseResultMessage(message:string):string{
+    const taskResult:TaskResultObj = JSON.parse(message)
+    const fromClient = taskResult.fromClient;
+    if (fromClient == ownName) {
+      return taskResult.params.result;
+    }
+    return ""
   }
+
 
 
 

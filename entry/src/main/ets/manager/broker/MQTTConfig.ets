@@ -2,7 +2,7 @@ import { MQTTClient, MQTTOptionsType } from './MQTTClient'
 
 export const MQTTOption: MQTTOptionsType = {
   url: 'mqtt://192.168.99.159:1883',
-  clientId: 'mqtt123456@',
+  clientId: 'OpenHarmony 3.2',
   userName: 'root',
   password: 'admin',
   topic: '/test/123',

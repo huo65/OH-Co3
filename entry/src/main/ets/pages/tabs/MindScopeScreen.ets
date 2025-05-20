@@ -4,6 +4,10 @@ import { ModelManager } from '../../manager/worker/ModelManager';
 import { Scheduler} from '../../manager/scheduler/Scheduler';
 import systemDateTime from '@ohos.systemDateTime';
 import { taskDispatch, TaskInfo } from '../../manager/broker/task/TaskDispatch';
+import emitter from '@ohos.events.emitter';
+import { nodeInfoSyn } from '../../manager/broker/monitor/NodeInfoSyn';
+import { RESULT } from '../../manager/broker/MQTTClient';
+import { DataPass, RealDataPass } from './BrokerScreen';
 
 interface PredictResult {
   maxArray: number[];
@@ -109,10 +113,26 @@ export struct MindSpore {
     "Jewellery", "Bridge", "Cuisine", "Bread", "Caving",
     "Shell", "Wreath", "Roof", "Cookie", "Canoe"];
   @State logMessages: Array<string> = [];  // 新增日志状态
+
   // 当 Tabs 发生变化 && 页面显示 时（监听父组件的 currentIndex 和 isPageShow）
   onTabsChange() {
     if (this.currentIndex === 2 && this.isPageShow === true) {
     }
+  }
+  aboutToAppear(): void {
+    emitter.on({
+      eventId: RESULT
+    }, (data) => {
+      let message:string = JSON.stringify(data)
+      let dataMessage:DataPass = JSON.parse(message)
+      let realData:string = JSON.stringify(dataMessage.data)
+      let realMessage:RealDataPass = JSON.parse(realData)
+      let res =  taskDispatch.parseResultMessage(realMessage.content);
+      if (res != "") {
+        this.logMessages.push("[6/6] 结果接收成功"+res)
+      }
+
+    });
   }
 
   private modelManager: ModelManager = new ModelManager();

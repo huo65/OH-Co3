@@ -10,7 +10,7 @@ interface NodeInfoObj {
   params: NodeInfo
 }
 
-const ownName:String = "OpenHarmony 3.2"
+const ownName:string = "OpenHarmony 3.2"
 class NodeInfoSyn{
 
   otherNodeInfo:NodeInfo[] = [];

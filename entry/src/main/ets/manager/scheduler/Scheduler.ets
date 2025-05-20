@@ -3,6 +3,7 @@ import { ownName } from '../broker/monitor/NodeInfoSyn';
 import { taskDispatch, TaskInfo } from '../broker/task/TaskDispatch';
 import { NodeInfo, systemProfiler } from '../monitor/SystemProfiler';
 import { ModelManager } from '../worker/ModelManager';
+import systemDateTime from '@ohos.systemDateTime';
 
 class Scheduler{
   private static SchedulerInstance: Scheduler
@@ -32,6 +33,7 @@ class Scheduler{
       if (highestScoreNode[0] != ownName) {
         logMessages.push('[4/6] 任务发送到其他节点')
         this.dispatchTask(uri, highestScoreNode[0])
+        logMessages.push('[5/6] 任务发送成功')
         return false
       }
     } else {
@@ -54,9 +56,12 @@ class Scheduler{
 
   async dispatchTask(url:string, to:string){
     let taskInfo: TaskInfo = new TaskInfo()
-    taskInfo.taskId = "idhuo"
-    taskInfo.fromClientId = "oh"
-    taskInfo.toClientId = "Lenovo TB-J607F"
+    systemDateTime.getCurrentTime(false, (error, time) => {
+      console.info(`Succeeded in getting currentTime : ${time}`);
+      taskInfo.taskId = time.toString()
+    });
+    taskInfo.fromClientId = ownName
+    taskInfo.toClientId = to
     taskInfo.interTime = "now"
     taskInfo.params.bitmap = await this.modelManager.processImageTOBase64(url)
     taskDispatch.sendTask(taskInfo)
