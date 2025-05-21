@@ -54,17 +54,40 @@ class Scheduler{
 
 
 
-  async dispatchTask(url:string, to:string){
-    let taskInfo: TaskInfo = new TaskInfo()
-    systemDateTime.getCurrentTime(false, (error, time) => {
+  async dispatchTask(url: string, to: string) {
+    let taskInfo: TaskInfo = new TaskInfo();
+
+    try {
+      // 使用封装的 Promise 方法获取当前时间
+      const time = await this.getCurrentTimeAsync();
       console.info(`Succeeded in getting currentTime : ${time}`);
-      taskInfo.taskId = time.toString()
+      taskInfo.taskId = time.toString();
+
+      // 初始化其他字段
+      taskInfo.fromClientId = ownName;
+      taskInfo.toClientId = to;
+      taskInfo.interTime = "now";
+      taskInfo.params.bitmap = await this.modelManager.processImageTOBase64(url);
+
+      // 所有数据准备完毕后再发送任务
+      taskDispatch.sendTask(taskInfo);
+    } catch (error) {
+      console.error("Failed to get current time:", error);
+      // 可选：处理错误或提示用户
+    }
+  }
+
+  // 将原来的回调方式封装为 Promise
+  private getCurrentTimeAsync(): Promise<number> {
+    return new Promise((resolve, reject) => {
+      systemDateTime.getCurrentTime(false, (error, time) => {
+        if (error) {
+          reject(error);
+        } else {
+          resolve(time);
+        }
+      });
     });
-    taskInfo.fromClientId = ownName
-    taskInfo.toClientId = to
-    taskInfo.interTime = "now"
-    taskInfo.params.bitmap = await this.modelManager.processImageTOBase64(url)
-    taskDispatch.sendTask(taskInfo)
   }
 }
 export { Scheduler };

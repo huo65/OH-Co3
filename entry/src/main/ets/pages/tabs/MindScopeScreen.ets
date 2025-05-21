@@ -258,9 +258,9 @@ export struct MindSpore {
           return;
         }
         this.logMessages.push('[2/6] 已选择图片: ' + photoSelectResult.photoUris[0]);
+        this.uris = photoSelectResult.photoUris;
         if (SchedulerInstance.workScheduler(this.uris[0], this.logMessages)){
           try {
-            this.uris = photoSelectResult.photoUris;
             this.logMessages.push('[4/6] 本地执行开始图片预处理...');
             const processedImage = await this.modelManager.processImage(this.uris[0]);
             this.logMessages.push('[5/6] 开始模型推理...');
