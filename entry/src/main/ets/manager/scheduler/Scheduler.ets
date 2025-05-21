@@ -4,6 +4,7 @@ import { taskDispatch, TaskInfo } from '../broker/task/TaskDispatch';
 import { NodeInfo, systemProfiler } from '../monitor/SystemProfiler';
 import { ModelManager } from '../worker/ModelManager';
 import systemDateTime from '@ohos.systemDateTime';
+import { paramSyn } from '../broker/paramOpt/ParamSyn';
 
 class Scheduler{
   private static SchedulerInstance: Scheduler
@@ -42,7 +43,8 @@ class Scheduler{
     return true
   }
   calculate_score(nodeInfo:NodeInfo){
-    let  score = 0.2 * (100 - nodeInfo.cpuUsage) + 0.5 *(100 - nodeInfo.memoryUsage)  + 0.1 * nodeInfo.storageFree +0.1 *nodeInfo.batteryLevel;
+    let param = paramSyn.getNewParam()
+    let score = param[0] * (100 - nodeInfo.cpuUsage) + param[1] *(100 - nodeInfo.memoryUsage)  + param[3] * nodeInfo.storageFree + param[2] *nodeInfo.batteryLevel;
     return score;
   }
   public static getInstance(): Scheduler {

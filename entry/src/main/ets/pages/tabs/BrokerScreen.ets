@@ -3,6 +3,8 @@ import { MQTTClient, EVENTID} from '../../manager/broker/MQTTClient'
 import emitter from '@ohos.events.emitter';
 import { MQTTOption } from '../../manager/broker/MQTTConfig';
 import { nodeInfoSyn } from '../../manager/broker/monitor/NodeInfoSyn';
+import { paramSyn } from '../../manager/broker/paramOpt/ParamSyn';
+
 export interface DataPass {
   data:string;
 }
@@ -27,7 +29,7 @@ export struct  MqttClientScreen {
       this.checkConnectionStatus()
       this.receiveMsg.shift()
     }, 5000);
-    MQTTInstance.subscribeTopic(["/device/list","/device/status","task/assign","task/result"])
+    MQTTInstance.subscribeTopic(["/device/list","/device/status","task/assign","task/result","/optimization/param"])
     emitter.on({
       eventId: EVENTID
     }, (data) => {
@@ -37,6 +39,9 @@ export struct  MqttClientScreen {
       let realMessage:RealDataPass = JSON.parse(realData)
       if (realMessage.topic == "/device/status") {
         nodeInfoSyn.parseNodeInfoMessage(realMessage.content);
+      }
+      if (realMessage.topic == "/optimization/param") {
+        paramSyn.parseParamMessage(realMessage.content);
       }
       this.receiveMsg.push(message)
     });
