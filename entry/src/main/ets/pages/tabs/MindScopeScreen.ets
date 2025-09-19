@@ -1,6 +1,6 @@
 import { BusinessError } from '@ohos.base';
 import photoAccessHelper from '@ohos.file.photoAccessHelper';
-import { ModelManager } from '../../manager/worker/ModelManager';
+
 import { Scheduler} from '../../manager/scheduler/Scheduler';
 import systemDateTime from '@ohos.systemDateTime';
 import { taskDispatch, TaskInfo } from '../../manager/broker/task/TaskDispatch';
@@ -8,12 +8,14 @@ import emitter from '@ohos.events.emitter';
 import { nodeInfoSyn } from '../../manager/broker/monitor/NodeInfoSyn';
 import { RESULT } from '../../manager/broker/MQTTClient';
 import { DataPass, RealDataPass } from './BrokerScreen';
+import { ModelManager } from '../../manager/worker/ModelManager';
 
 interface PredictResult {
   maxArray: number[];
   maxIndexArray: number[];
 }
 const SchedulerInstance: Scheduler = Scheduler.getInstance();
+const ModelManagerInstance: ModelManager = ModelManager.getInstance()
 
 @Component
 export struct MindSpore {
@@ -136,7 +138,8 @@ export struct MindSpore {
     });
   }
 
-  private modelManager: ModelManager = new ModelManager();
+  // private modelManager: ModelManager = new ModelManager();
+
   @State isLoading: boolean = false;
 
   build() {
@@ -205,7 +208,7 @@ export struct MindSpore {
           .onClick(async () => {
             this.isLoading = true
             try {
-              await this.modelManager.initModel(this.modelName)
+              await ModelManagerInstance.initModel(this.modelName)
               const result = await this.handleImageSelection()
               this.maxArray = result.maxArray
               this.maxIndexArray = result.maxIndexArray
@@ -264,10 +267,10 @@ export struct MindSpore {
         if (SchedulerInstance.workScheduler(this.uris[0], this.logMessages)){
           try {
             this.logMessages.push('[4/6] 本地执行开始图片预处理...');
-            const processedImage = await this.modelManager.processImage(this.uris[0]);
+            const processedImage = await ModelManagerInstance.processImage(this.uris[0]);
             this.logMessages.push('[5/6] 开始模型推理...');
 
-            const predictResult = await this.modelManager.predictWithTopResults([processedImage]);
+            const predictResult = await ModelManagerInstance.predictWithTopResults([processedImage]);
             this.logMessages.push('[6/6] 推理完成');
             console.info('=========MS_LITE_LOG END=========');
             resolve(predictResult);

@@ -2,13 +2,13 @@ import HashMap from '@ohos.util.HashMap';
 import { ownName } from '../broker/monitor/NodeInfoSyn';
 import { taskDispatch, TaskInfo } from '../broker/task/TaskDispatch';
 import { NodeInfo, systemProfiler } from '../monitor/SystemProfiler';
-import { ModelManager } from '../worker/ModelManager';
 import systemDateTime from '@ohos.systemDateTime';
 import { paramSyn } from '../broker/paramOpt/ParamSyn';
-
+import { ModelManager } from '../../manager/worker/ModelManager';
+const ModelManagerInstance: ModelManager = ModelManager.getInstance()
 class Scheduler{
   private static SchedulerInstance: Scheduler
-  private modelManager: ModelManager = new ModelManager();
+  // private modelManager: ModelManager = new ModelManager();
 
 
   private deviceInfos:HashMap<string,NodeInfo> = new HashMap();
@@ -69,7 +69,7 @@ class Scheduler{
       taskInfo.fromClientId = ownName;
       taskInfo.toClientId = to;
       taskInfo.interTime = "now";
-      taskInfo.params.bitmap = await this.modelManager.processImageTOBase64(url);
+      taskInfo.params.bitmap = await ModelManagerInstance.processImageTOBase64(url);
 
       // 所有数据准备完毕后再发送任务
       taskDispatch.sendTask(taskInfo);

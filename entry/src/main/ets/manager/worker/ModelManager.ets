@@ -25,11 +25,19 @@ interface PredictResult {
     val: number;
     idx: number;
   }
-export class ModelManager {
+class ModelManager {
+  private static instance: ModelManager
   private modelBuffer: ArrayBuffer = new ArrayBuffer(0);
   private modelInputHeight: number = 224;
   private modelInputWidth: number = 224;
   private isInit: Boolean = false;
+  // 静态方法获取唯一实例
+  public static getInstance(): ModelManager {
+    if (!ModelManager.instance) {
+      ModelManager.instance = new ModelManager()
+    }
+    return ModelManager.instance
+  }
 
   async initModel(modelName: string): Promise<void> {
     if (this.isInit) {
@@ -167,3 +175,4 @@ export class ModelManager {
     return imageSource.createPixelMap(opts);
   }
 }
+export {ModelManager}
