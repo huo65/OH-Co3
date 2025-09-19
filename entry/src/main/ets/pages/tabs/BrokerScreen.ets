@@ -13,7 +13,8 @@ export  interface RealDataPass {
   content: string;
 }
 
-
+//ohpm uninstall @ohos/mqtt
+//ohpm install @ohos/mqtt@2.0.12
 const MQTTInstance: MQTTClient = MQTTClient.getFirstInstance(MQTTOption)
 // 定义一个简单的MQTT客户端组件
 @Component
