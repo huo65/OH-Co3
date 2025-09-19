@@ -120,6 +120,7 @@ export struct MindSpore {
     }
   }
   aboutToAppear(): void {
+    // 由于结果需要实时反馈，此处非统一处理逻辑
     emitter.on({
       eventId: RESULT
     }, (data) => {
