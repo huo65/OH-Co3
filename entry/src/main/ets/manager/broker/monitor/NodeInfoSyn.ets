@@ -2,6 +2,7 @@ import { NodeInfo } from '../../monitor/SystemProfiler'
 import { MQTTClient } from '../MQTTClient'
 import {MQTTOption} from '../MQTTConfig'
 import HashMap from '@ohos.util.HashMap'
+import deviceInfo from '@ohos.deviceInfo';
 
 const MQTTInstance: MQTTClient = MQTTClient.getFirstInstance(MQTTOption)
 interface NodeInfoObj {
@@ -10,7 +11,7 @@ interface NodeInfoObj {
   params: NodeInfo
 }
 
-const ownName:string = "OpenHarmony 3.2"
+const ownName:string = deviceInfo.marketName
 class NodeInfoSyn{
 
   otherNodeInfo:NodeInfo[] = [];
