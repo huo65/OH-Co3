@@ -14,7 +14,7 @@ interface PredictResult {
   maxIndexArray: number[];
 }
 const SchedulerInstance: Scheduler = Scheduler.getInstance();
-// TODO 参照Android改进
+
 @Component
 export struct MindSpore {
   // @Provide 装饰器和 @Consume 装饰器：与后代组件双向同步
@@ -259,6 +259,7 @@ export struct MindSpore {
         }
         this.logMessages.push('[2/6] 已选择图片: ' + photoSelectResult.photoUris[0]);
         this.uris = photoSelectResult.photoUris;
+        // 执行计算调度
         if (SchedulerInstance.workScheduler(this.uris[0], this.logMessages)){
           try {
             this.logMessages.push('[4/6] 本地执行开始图片预处理...');

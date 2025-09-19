@@ -41,13 +41,13 @@ export struct Performance {
   }
   updateInfo(){
     this.deviceInfos = systemProfiler.getDeviceInfos()
-    // this.deviceNames = []
-    // for (const key of this.deviceInfos.keys()) {
-    //   let nodeNameOption:SelectOption = {value:key}
-    //   this.deviceNames.push(nodeNameOption)
-    //   console.log("updateHuoADD:" + nodeNameOption.value);
-    // }
-    // console.log("updateHuoADD:");
+    this.deviceNames = []
+    for (const key of this.deviceInfos.keys()) {
+      let nodeNameOption:SelectOption = {value:key}
+      this.deviceNames.push(nodeNameOption)
+      console.log("updateHuoADD:" + nodeNameOption.value);
+    }
+    console.log("updateHuoADD:");
   }
   showInfo(nameChoose:string){
     let info:NodeInfo = this.deviceInfos.get(nameChoose)
