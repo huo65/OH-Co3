@@ -1,9 +1,11 @@
+import { GlobalTaskManager } from '../../worker/GlobalTaskManager';
+import { SerialTaskQueue } from '../../worker/SerialTaskQueue';
 import { ownName } from '../monitor/NodeInfoSyn';
 import { MQTTClient } from '../MQTTClient'
 import {MQTTOption} from '../MQTTConfig'
 const MQTTInstance: MQTTClient = MQTTClient.getFirstInstance(MQTTOption)
 interface TaskParams {
-  bitmap?: string;
+  bitmap: string;
 }
 interface TaskResultObj{
   taskId: string,
@@ -17,27 +19,27 @@ interface ResultInfo{
 
 class TaskInfo {
   taskId: string;
-  fromClientId: string;
-  toClientId: string;
+  fromClient: string;
+  toClient: string;
   interTime: string;
   params: TaskParams;
   constructor() {
     this.taskId = "";
-    this.fromClientId = "";
-    this.toClientId = "";
+    this.fromClient = "";
+    this.toClient = "";
     this.interTime = "";
-    this.params = {};
+    this.params = {bitmap:""};
   }
 }
 class TaskDispatch{
-  ownName:String = "OpenHarmony 3.2";
+  // ownName:String = "OpenHarmony 3.2";
   async sendTask(taskInfo: TaskInfo): Promise<boolean> {
     const bitmapParams:TaskParams =  taskInfo.params
   try {
     const message = JSON.stringify({
       taskId: taskInfo.taskId,
-      fromClient: taskInfo.fromClientId,
-      toClient: taskInfo.toClientId,
+      fromClient: taskInfo.fromClient,
+      toClient: taskInfo.toClient,
       timestamp: taskInfo.interTime,
       params:bitmapParams
     });
@@ -48,9 +50,7 @@ class TaskDispatch{
     return false;
   }
 }
-  parseTaskMessage(){
-
-  }
+  // TODO 发送接收任务的结果
   sendTaskResult(){
 
   }
@@ -75,6 +75,16 @@ class TaskDispatch{
       return taskResult.params.result;
     }
     return ""
+  }
+  parseTaskMessage(message:string){
+    const taskInfo:TaskInfo = JSON.parse(message)
+    // TODO 注意重复处理
+    if (taskInfo.toClient == ownName) {
+    //   做一个任务队列，避免阻塞，同时可以扩展任务流转
+      GlobalTaskManager.getQueue().addTask(taskInfo);
+
+    }
+
   }
 
 

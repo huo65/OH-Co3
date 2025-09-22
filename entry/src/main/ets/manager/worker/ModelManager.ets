@@ -74,6 +74,29 @@ class ModelManager {
 
     return this.normalizeImageData(new Uint8Array(readBuffer));
   }
+  // 根据接受的参数处理图片
+  async processImageWithParam(bitmap: string): Promise<ArrayBuffer> {
+    const pixelMap = await this.base64ToPixelMap(bitmap);
+
+    // 图片预处理
+    const info = await pixelMap.getImageInfo();
+    await pixelMap.scale(256.0 / info.size.width, 256.0 / info.size.height);
+    // 修改crop参数类型
+    const cropOptions: CropOptions = {
+      x: 16,
+      y: 16,
+      size: {
+        height: this.modelInputHeight,
+        width: this.modelInputWidth
+      }
+    };
+    await pixelMap.crop(cropOptions);
+    // 获取像素数据
+    const readBuffer = new ArrayBuffer(this.modelInputHeight * this.modelInputWidth * 4);
+    await pixelMap.readPixelsToBuffer(readBuffer);
+
+    return this.normalizeImageData(new Uint8Array(readBuffer));
+  }
 
   private normalizeImageData(imageArr: Uint8Array): ArrayBuffer {
     const means = [0.485, 0.456, 0.406];

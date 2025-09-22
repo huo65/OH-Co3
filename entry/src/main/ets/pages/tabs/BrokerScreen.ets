@@ -4,6 +4,7 @@ import emitter from '@ohos.events.emitter';
 import { MQTTOption } from '../../manager/broker/MQTTConfig';
 import { nodeInfoSyn } from '../../manager/broker/monitor/NodeInfoSyn';
 import { paramSyn } from '../../manager/broker/paramOpt/ParamSyn';
+import { taskDispatch } from '../../manager/broker/task/TaskDispatch';
 
 export interface DataPass {
   data:string;
@@ -30,7 +31,7 @@ export struct  MqttClientScreen {
       this.checkConnectionStatus()
       this.receiveMsg.shift()
     }, 5000);
-    MQTTInstance.subscribeTopic(["/device/list","/device/status","task/assign","task/result","/optimization/param"])
+    MQTTInstance.subscribeTopic(["/device/list","/device/status","/task/assign","/task/result","/optimization/param"])
     emitter.on({
       eventId: EVENTID
     }, (data) => {
@@ -43,6 +44,10 @@ export struct  MqttClientScreen {
       }
       if (realMessage.topic == "/optimization/param") {
         paramSyn.parseParamMessage(realMessage.content);
+      }
+      // 接收任务，参数
+      if (realMessage.topic == "/task/assign") {
+        taskDispatch.parseTaskMessage(realMessage.content);
       }
       this.receiveMsg.push(message)
     });

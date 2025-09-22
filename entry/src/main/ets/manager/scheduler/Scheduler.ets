@@ -66,8 +66,8 @@ class Scheduler{
       taskInfo.taskId = time.toString();
 
       // 初始化其他字段
-      taskInfo.fromClientId = ownName;
-      taskInfo.toClientId = to;
+      taskInfo.fromClient = ownName;
+      taskInfo.toClient = to;
       taskInfo.interTime = "now";
       taskInfo.params.bitmap = await ModelManagerInstance.processImageTOBase64(url);
 
