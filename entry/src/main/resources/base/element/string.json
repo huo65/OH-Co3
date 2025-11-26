@@ -11,6 +11,18 @@
     {
       "name": "EntryAbility_label",
       "value": "OHCO"
+    },
+    {
+      "name": "wifi_reason",
+      "value": "需要获取WiFi状态信息以实现网络质量检测"
+    },
+    {
+      "name": "location_reason",
+      "value": "需要获取设备位置信息以提供周边服务推荐"
+    },
+    {
+      "name": "bluetooth_reason",
+      "value": "需要连接蓝牙设备进行数据传输"
     }
   ]
 }
