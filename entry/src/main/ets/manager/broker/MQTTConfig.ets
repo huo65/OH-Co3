@@ -1,8 +1,10 @@
+import { ownName } from './monitor/NodeInfoSyn'
 import { MQTTClient, MQTTOptionsType } from './MQTTClient'
+import deviceInfo from '@ohos.deviceInfo';
 
 export const MQTTOption: MQTTOptionsType = {
-  url: 'mqtt://192.168.34.159:1883',
-  clientId: 'OpenHarmony 3.2',
+  url: 'mqtt://10.123.74.159:1883',
+  clientId: deviceInfo.marketName + "_" + Math.floor(Math.random() * 10000),
   userName: 'root',
   password: 'admin',
   topic: '/test/123',

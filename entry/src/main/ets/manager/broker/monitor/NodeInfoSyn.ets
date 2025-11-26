@@ -4,14 +4,15 @@ import {MQTTOption} from '../MQTTConfig'
 import HashMap from '@ohos.util.HashMap'
 import deviceInfo from '@ohos.deviceInfo';
 
-const MQTTInstance: MQTTClient = MQTTClient.getFirstInstance(MQTTOption)
+
 interface NodeInfoObj {
   deviceName: string;
   score: number;
   params: NodeInfo
 }
 
-const ownName:string = deviceInfo.marketName
+const ownName: string = MQTTOption.clientId as string
+
 class NodeInfoSyn{
 
   otherNodeInfo:NodeInfo[] = [];
@@ -26,6 +27,7 @@ class NodeInfoSyn{
   }
 
   sendOwnInfo(nodeInfo: NodeInfo): void {
+    const MQTTInstance: MQTTClient = MQTTClient.getFirstInstance(MQTTOption)
     const message: string = `
     {
         "deviceName": "${nodeInfo.deviceName}",

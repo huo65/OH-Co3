@@ -4,6 +4,7 @@ import statfs from '@ohos.file.statvfs';
 import HashMap from '@ohos.util.HashMap';
 import testStatisticsApi from 'libentry.so';
 import { nodeInfoSyn } from '../broker/monitor/NodeInfoSyn';
+import { MQTTOption } from '../broker/MQTTConfig';
 
 export class NodeInfo{
   // 设备产品名称
@@ -63,7 +64,7 @@ class SystemProfiler{
   }
   // 获取设备产品名称
   getDeviceName() {
-    this.ownInfo.deviceName = deviceInfo.marketName
+    this.ownInfo.deviceName = MQTTOption.clientId as string
   }
   getCpuInfo() {
     this.ownInfo.cpuUsage = Number(testStatisticsApi.getCpu_stat_cpu().split(" ")[0]);
