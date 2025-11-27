@@ -2,9 +2,9 @@
 #include "TestStatisticsInfo.h"
 #include "common/plugin_common.h"
 
+
 EXTERN_C_START
-static napi_value Init(napi_env env, napi_value exports)
-{
+static napi_value Init(napi_env env, napi_value exports) {
     bool ret = TestStatisticsInfo::Export(env, exports);
     if (!ret) {
         LOGE("napi_value Init failed");
