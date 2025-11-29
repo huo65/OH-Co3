@@ -1,5 +1,5 @@
 import router from '@ohos.router';
-import { NodeInfo, systemProfiler } from '../../manager/monitor/SystemProfiler';
+import { DeviceInfo, systemProfiler } from '../../manager/monitor/SystemProfiler';
 import { SelectTitleBar } from "@ohos.arkui.advanced.SelectTitleBar"
 import HashMap from '@ohos.util.HashMap';
 
@@ -21,7 +21,7 @@ export struct Performance {
   @State memorySize: number = 0
   @State cpuUsage: number = 0
   @State statfsFreeSize: number = 0
-  @State deviceInfos:HashMap<string,NodeInfo> = new HashMap();
+  @State deviceInfos:HashMap<string,DeviceInfo> = new HashMap();
   // https://docs.openharmony.cn/pages/v4.1/zh-cn/application-dev/quick-start/arkts-state.md {value:"Lenovo TB-J607F"},{value:"OpenHarmony 3.2"}
   @State deviceNames:SelectOption[] = [{value:"Lenovo TB-J607F"},{value:"OpenHarmony 3.2"}];
   @State isRefreshing: boolean = false
@@ -50,7 +50,7 @@ export struct Performance {
     console.log("updateHuoADD:");
   }
   showInfo(nameChoose:string){
-    let info:NodeInfo = this.deviceInfos.get(nameChoose)
+    let info:DeviceInfo = this.deviceInfos.get(nameChoose)
     if (info) {
       this.batteryState = info.batteryLevel
       this.memorySize = info.memoryUsage

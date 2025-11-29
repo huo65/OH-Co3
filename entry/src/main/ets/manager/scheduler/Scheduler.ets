@@ -1,7 +1,7 @@
 import HashMap from '@ohos.util.HashMap';
 import { ownName } from '../broker/monitor/NodeInfoSyn';
 import { taskDispatch, TaskInfo } from '../broker/task/TaskDispatch';
-import { NodeInfo, systemProfiler } from '../monitor/SystemProfiler';
+import { DeviceInfo, systemProfiler } from '../monitor/SystemProfiler';
 import systemDateTime from '@ohos.systemDateTime';
 import { paramSyn } from '../broker/paramOpt/ParamSyn';
 import { ModelManager } from '../../manager/worker/ModelManager';
@@ -11,12 +11,12 @@ class Scheduler{
   // private modelManager: ModelManager = new ModelManager();
 
 
-  private deviceInfos:HashMap<string,NodeInfo> = new HashMap();
+  private deviceInfos:HashMap<string,DeviceInfo> = new HashMap();
   workScheduler(uri:string, logMessages: Array<string>):Boolean{
     logMessages.push('[3/6] 调度处理')
     this.deviceInfos =  systemProfiler.getDeviceInfos();
 
-    let highestScoreNode: [string, NodeInfo] | undefined = undefined;
+    let highestScoreNode: [string, DeviceInfo] | undefined = undefined;
 
     for (let entry of this.deviceInfos.entries()) {
       const key = entry[0];
@@ -42,7 +42,7 @@ class Scheduler{
     }
     return true
   }
-  calculate_score(nodeInfo:NodeInfo){
+  calculate_score(nodeInfo:DeviceInfo){
     let param = paramSyn.getNewParam()
     let score = param[0] * (100 - nodeInfo.cpuUsage) + param[1] *(100 - nodeInfo.memoryUsage)  + param[3] * nodeInfo.storageFree + param[2] *nodeInfo.batteryLevel;
     return score;
