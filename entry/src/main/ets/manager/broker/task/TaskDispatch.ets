@@ -3,7 +3,7 @@ import { SerialTaskQueue } from '../../worker/SerialTaskQueue';
 import { ownName } from '../monitor/NodeInfoSyn';
 import { MQTTClient } from '../MQTTClient'
 import {MQTTOption} from '../MQTTConfig'
-const MQTTInstance: MQTTClient = MQTTClient.getFirstInstance(MQTTOption)
+const MQTTInstance: MQTTClient = MQTTClient.getInstance()
 interface TaskParams {
   bitmap: string;
 }

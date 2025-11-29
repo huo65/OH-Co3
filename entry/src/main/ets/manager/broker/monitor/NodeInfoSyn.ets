@@ -4,7 +4,7 @@ import {MQTTOption} from '../MQTTConfig'
 import HashMap from '@ohos.util.HashMap'
 import deviceInfo from '@ohos.deviceInfo';
 
-const MQTTInstance: MQTTClient = MQTTClient.getFirstInstance(MQTTOption)
+const MQTTInstance: MQTTClient = MQTTClient.getInstance()
 interface NodeInfoObj {
   deviceName: string;
   score: number;
