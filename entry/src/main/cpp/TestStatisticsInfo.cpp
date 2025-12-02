@@ -22,7 +22,6 @@ bool TestStatisticsInfo::Export(napi_env env, napi_value exports) {
     napi_property_descriptor desc[] = {
         DECLARE_NAPI_FUNCTION("getCpuCount", TestStatisticsInfo::GetCpuCount),
         DECLARE_NAPI_FUNCTION("getMemTotal", TestStatisticsInfo::GetMemTotal),
-        DECLARE_NAPI_FUNCTION("getFreeMem", TestStatisticsInfo::GetFreeMem),
         DECLARE_NAPI_FUNCTION("getCachedMem", TestStatisticsInfo::GetCachedMem),
         DECLARE_NAPI_FUNCTION("getCpuInfo", TestStatisticsInfo::GetCpuInfo),
         DECLARE_NAPI_FUNCTION("getMemoryInfo", TestStatisticsInfo::GetMemoryInfo),
@@ -116,24 +115,7 @@ napi_value TestStatisticsInfo::GetMemTotal(napi_env env, napi_callback_info info
     return res;
 }
 
-napi_value TestStatisticsInfo::GetFreeMem(napi_env env, napi_callback_info info) {
-    if ((nullptr == env) || (nullptr == info)) {
-        LOGE("TestStatisticsInfo::GetFreeMem: env or info is null");
-        return nullptr;
-    }
 
-    napi_value thisArg;
-    if (napi_ok != napi_get_cb_info(env, info, nullptr, nullptr, &thisArg, nullptr)) {
-        LOGE("TestStatisticsInfo::GetFreeMem: napi_get_cb_info fail");
-        return nullptr;
-    }
-    
-    std::string FreeMem = getMemInfoMap("MemFree");
-    LOGI("GetFreeMem success, MemFree is %{public}s", FreeMem.c_str());
-    napi_value res;
-    napi_create_string_utf8(env, FreeMem.c_str(), strlen(FreeMem.c_str()), &res);
-    return res;
-}
 
 napi_value TestStatisticsInfo::GetAvailableMem(napi_env env, napi_callback_info info) {
     if ((nullptr == env) || (nullptr == info)) {
@@ -212,6 +194,10 @@ std::string TestStatisticsInfo::parseLine(std::string line) {
 std::string TestStatisticsInfo::getMemInfoMap(std::string field) {
     
     std::ifstream meminfo("/proc/meminfo");
+    if (!meminfo.is_open()) {
+        LOGE("Failed to open /proc/meminfo");
+        return "";
+    }
     std::string line;
     std::string totalField = "MemTotal";
     std::string freeField = "MemFree";
@@ -292,38 +278,38 @@ napi_value TestStatisticsInfo::GetCpu_stat_cpu(napi_env env, napi_callback_info 
         return nullptr;
     }
     std::string cpu_cached0 = getCpu_stat("cpu\u0020");
-    std::string cpu0_cached0 = getCpu_stat("cpu0");
-    std::string cpu1_cached0 = getCpu_stat("cpu1");
-    std::string cpu2_cached0 = getCpu_stat("cpu2");
-    std::string cpu3_cached0 = getCpu_stat("cpu3");
-    std::string cpu4_cached0 = getCpu_stat("cpu4");
-    std::string cpu5_cached0 = getCpu_stat("cpu5");
-    std::string cpu6_cached0 = getCpu_stat("cpu6");
-    std::string cpu7_cached0 = getCpu_stat("cpu7");
+//    std::string cpu0_cached0 = getCpu_stat("cpu0");
+//    std::string cpu1_cached0 = getCpu_stat("cpu1");
+//    std::string cpu2_cached0 = getCpu_stat("cpu2");
+//    std::string cpu3_cached0 = getCpu_stat("cpu3");
+//    std::string cpu4_cached0 = getCpu_stat("cpu4");
+//    std::string cpu5_cached0 = getCpu_stat("cpu5");
+//    std::string cpu6_cached0 = getCpu_stat("cpu6");
+//    std::string cpu7_cached0 = getCpu_stat("cpu7");
     
     std::this_thread::sleep_for(std::chrono::milliseconds(100)); // 延时 100 毫秒
     
     std::string cpu_cached1 = getCpu_stat("cpu\u0020");
-    std::string cpu0_cached1 = getCpu_stat("cpu0");
-    std::string cpu1_cached1 = getCpu_stat("cpu1");
-    std::string cpu2_cached1 = getCpu_stat("cpu2");
-    std::string cpu3_cached1 = getCpu_stat("cpu3");
-    std::string cpu4_cached1 = getCpu_stat("cpu4");
-    std::string cpu5_cached1 = getCpu_stat("cpu5");
-    std::string cpu6_cached1 = getCpu_stat("cpu6");
-    std::string cpu7_cached1 = getCpu_stat("cpu7");
+//    std::string cpu0_cached1 = getCpu_stat("cpu0");
+//    std::string cpu1_cached1 = getCpu_stat("cpu1");
+//    std::string cpu2_cached1 = getCpu_stat("cpu2");
+//    std::string cpu3_cached1 = getCpu_stat("cpu3");
+//    std::string cpu4_cached1 = getCpu_stat("cpu4");
+//    std::string cpu5_cached1 = getCpu_stat("cpu5");
+//    std::string cpu6_cached1 = getCpu_stat("cpu6");
+//    std::string cpu7_cached1 = getCpu_stat("cpu7");
     
     std::string cpu = calculateCpuUtilization(cpu_cached0, cpu_cached1);
-    std::string cpu0 = calculateCpuUtilization(cpu0_cached0, cpu0_cached1);
-    std::string cpu1 = calculateCpuUtilization(cpu1_cached0, cpu1_cached1);
-    std::string cpu2 = calculateCpuUtilization(cpu2_cached0, cpu2_cached1);
-    std::string cpu3 = calculateCpuUtilization(cpu3_cached0, cpu3_cached1);
-    std::string cpu4 = calculateCpuUtilization(cpu4_cached0, cpu4_cached1);
-    std::string cpu5 = calculateCpuUtilization(cpu5_cached0, cpu5_cached1);
-    std::string cpu6 = calculateCpuUtilization(cpu6_cached0, cpu6_cached1);
-    std::string cpu7 = calculateCpuUtilization(cpu7_cached0, cpu7_cached1);
+//    std::string cpu0 = calculateCpuUtilization(cpu0_cached0, cpu0_cached1);
+//    std::string cpu1 = calculateCpuUtilization(cpu1_cached0, cpu1_cached1);
+//    std::string cpu2 = calculateCpuUtilization(cpu2_cached0, cpu2_cached1);
+//    std::string cpu3 = calculateCpuUtilization(cpu3_cached0, cpu3_cached1);
+//    std::string cpu4 = calculateCpuUtilization(cpu4_cached0, cpu4_cached1);
+//    std::string cpu5 = calculateCpuUtilization(cpu5_cached0, cpu5_cached1);
+//    std::string cpu6 = calculateCpuUtilization(cpu6_cached0, cpu6_cached1);
+//    std::string cpu7 = calculateCpuUtilization(cpu7_cached0, cpu7_cached1);
     
-    std::string aaa = cpu + " " + cpu0 + " " + cpu1 + " " + cpu2 + " " + cpu3 + " " + cpu4 + " " + cpu5 + " " + cpu6 + " " + cpu7;
+    std::string aaa = cpu + " " ;
     
     LOGI("GetCpu_stat_cpu success! Cached is %{public}s", aaa.c_str());
     napi_value res;
@@ -335,23 +321,21 @@ napi_value TestStatisticsInfo::GetCpu_stat_cpu(napi_env env, napi_callback_info 
 
 
 std::string TestStatisticsInfo::getCpu_stat(std::string field) {
-
-    std::ifstream meminfo("/proc/stat");
+    LOGE("TestStatisticsInfo::GetStat");
+    
+    std::ifstream cpuInfo("/proc/stat");
+    if (!cpuInfo.is_open()) {
+        LOGE("Failed to open /proc/stat");
+        return "";
+    }
     std::string line;
-    std::string cpu0Field = "cpu0";
-    std::string cpu1Field = "cpu1";
-    std::string cpu2Field = "cpu2";
-    std::string cpu3Field = "cpu3";
-    std::string cpu4Field = "cpu4";
-    std::string cpu5Field = "cpu5";
-    std::string cpu6Field = "cpu6";
-    std::string cpu7Field = "cpu7";
     std::string cpuField = "cpu\u0020";
     std::string processesField = "processes"; // processes: 进程计数器统计。这个字段表示当前运行的进程数量。
     std::string procs_runningField = "procs_running"; //procs_running: 正在运行的进程计数器统计。这个字段表示当前正在运行的进程数量。
     std::string procs_blockedField = "procs_blocked";//procs_blocked: 阻塞的进程计数器统计。这个字段表示当前被阻塞的进程数量。
     std::string ctxtField = "ctxt";//上下文切换计数器统计。这个字段表示系统发生的上下文切换次数，可以用于评估系统的调度性能。
-    while (getline(meminfo, line)) {
+    while (getline(cpuInfo, line)) {
+        LOGE("TestStatisticsInfo::GetLine");
         if (line.find(processesField) != std::string::npos) {
             std::string res = line;
             _Cpu_stat[processesField] = res;
@@ -367,38 +351,6 @@ std::string TestStatisticsInfo::getCpu_stat(std::string field) {
         if (line.find(ctxtField) != std::string::npos) {
             std::string res = line;
             _Cpu_stat[ctxtField] = res;
-        }
-        if (line.find(cpu7Field) != std::string::npos) {
-            std::string res = line;
-            _Cpu_stat[cpu7Field] = res;
-        }
-        if (line.find(cpu6Field) != std::string::npos) {
-            std::string res = line;
-            _Cpu_stat[cpu6Field] = res;
-        }
-        if (line.find(cpu5Field) != std::string::npos) {
-            std::string res = line;
-            _Cpu_stat[cpu5Field] = res;
-        }
-        if (line.find(cpu4Field) != std::string::npos) {
-            std::string res = line;
-            _Cpu_stat[cpu4Field] = res;
-        }
-        if (line.find(cpu3Field) != std::string::npos) {
-            std::string res = line;
-            _Cpu_stat[cpu3Field] = res;
-        }
-        if (line.find(cpu2Field) != std::string::npos) {
-            std::string res = line;
-            _Cpu_stat[cpu2Field] = res;
-        }
-        if (line.find(cpu1Field) != std::string::npos) {
-            std::string res = line;
-            _Cpu_stat[cpu1Field] = res;
-        }
-        if (line.find(cpu0Field) != std::string::npos) {
-            std::string res = line;
-            _Cpu_stat[cpu0Field] = res;
         }
         if (line.find(cpuField) != std::string::npos) {
             std::string res = line;

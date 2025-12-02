@@ -17,7 +17,6 @@ public:
     static bool Export(napi_env env, napi_value exports);
     static napi_value GetCpuCount(napi_env env, napi_callback_info info);
     static napi_value GetMemTotal(napi_env env, napi_callback_info info);
-    static napi_value GetFreeMem(napi_env env, napi_callback_info info);
     static napi_value GetCachedMem(napi_env env, napi_callback_info info);
     static napi_value GetCpuInfo(napi_env env, napi_callback_info info);
     static napi_value GetMemoryInfo(napi_env env, napi_callback_info info);
