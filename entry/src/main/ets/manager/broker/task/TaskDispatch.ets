@@ -3,7 +3,7 @@ import { SerialTaskQueue } from '../../worker/SerialTaskQueue';
 import { ownName } from '../monitor/NodeInfoSyn';
 import { MQTTClient } from '../MQTTClient'
 import {MQTTOption} from '../MQTTConfig'
-const MQTTInstance: MQTTClient = MQTTClient.getInstance()
+
 interface TaskParams {
   bitmap: string;
 }
@@ -34,6 +34,7 @@ class TaskInfo {
 class TaskDispatch{
   // ownName:String = "OpenHarmony 3.2";
   async sendTask(taskInfo: TaskInfo): Promise<boolean> {
+    const MQTTInstance: MQTTClient = MQTTClient.getInstance()
     const bitmapParams:TaskParams =  taskInfo.params
   try {
     const message = JSON.stringify({
