@@ -43,15 +43,17 @@ class MQTTClient {
     this.init()
   }
 
-  // 静态方法获取唯一实例
-  public static getFirstInstance(mqttOptions: MQTTOptionsType): MQTTClient {
-    if (!MQTTClient.instance) {
+  // 根据配置初始化连接
+  public static getNewInstance(mqttOptions: MQTTOptionsType): MQTTClient {
       MQTTClient.instance = new MQTTClient(mqttOptions)
-    }
     return MQTTClient.instance
   }
-  // 静态方法获取唯一实例
+  // 获取实例
   public static getInstance(): MQTTClient {
+    if (!MQTTClient.instance) {
+    //   发送提醒？
+      throw new Error("MQTTClient 未初始化，请先连接")
+    }
     return MQTTClient.instance
   }
   public async isCon(): Promise<boolean> {
