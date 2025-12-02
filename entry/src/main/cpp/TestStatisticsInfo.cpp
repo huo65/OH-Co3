@@ -27,6 +27,7 @@ bool TestStatisticsInfo::Export(napi_env env, napi_value exports) {
         DECLARE_NAPI_FUNCTION("getCpuInfo", TestStatisticsInfo::GetCpuInfo),
         DECLARE_NAPI_FUNCTION("getMemoryInfo", TestStatisticsInfo::GetMemoryInfo),
         DECLARE_NAPI_FUNCTION("getAvailableMem", TestStatisticsInfo::GetAvailableMem),
+        DECLARE_NAPI_FUNCTION("getCpu_stat_cpu", TestStatisticsInfo::GetCpu_stat_cpu)
     };
 
     if (napi_ok != napi_define_properties(env, exports, sizeof(desc) / sizeof(desc[0]), desc)) {
