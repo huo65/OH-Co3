@@ -6,7 +6,8 @@ import testStatisticsApi from 'libentry.so';
 import { nodeInfoSyn } from '../broker/monitor/NodeInfoSyn';
 import { MQTTOption } from '../broker/MQTTConfig';
 import { hidebug } from '@kit.PerformanceAnalysisKit';
-
+import { taskpool } from '@kit.ArkTS';
+// TODO 更新接口
 export class NodeInfo{
   // 设备产品名称
   deviceName: string
@@ -28,6 +29,14 @@ export class NodeInfo{
     this.score = 0;
   }
 
+}
+@Concurrent
+async function getSystemCpuUsageAsync(): Promise<number> {
+  try {
+    return hidebug.getSystemCpuUsage();
+  } catch (error) {
+    throw new Error(`code: ${(error as BusinessError<Error>).code}, msg: ${(error as BusinessError<Error>).message}`);
+  }
 }
 
 class SystemProfiler{
@@ -67,10 +76,15 @@ class SystemProfiler{
   getDeviceName() {
     this.ownInfo.deviceName = MQTTOption.clientId as string
   }
-  getCpuInfo() {
-    //TODO 权限问题
-    // this.ownInfo.cpuUsage = Number(testStatisticsApi.getCpu_stat_cpu().split(" ")[0]);
-    this.ownInfo.cpuUsage = hidebug.getCpuUsage();
+  async getCpuInfo() {
+    try {
+      const task = new taskpool.Task(getSystemCpuUsageAsync);
+      const cpuUsage = await taskpool.execute(task);
+      console.info(`getSystemCpuUsage: ${cpuUsage}`);
+      this.ownInfo.cpuUsage = cpuUsage as number;
+    } catch (error) {
+      console.error(`CPU info error: ${error.message}`);
+    }
   }
   getmemoryInfo(){
     this.ownInfo.memoryUsage =(1 - (Number(testStatisticsApi.getAvailableMem().split(" ")[0]) / Number(testStatisticsApi.getMemTotal().split(" ")[0]))) * 100
