@@ -5,6 +5,7 @@ import HashMap from '@ohos.util.HashMap';
 import testStatisticsApi from 'libentry.so';
 import { nodeInfoSyn } from '../broker/monitor/NodeInfoSyn';
 import { MQTTOption } from '../broker/MQTTConfig';
+import { hidebug } from '@kit.PerformanceAnalysisKit';
 
 export class NodeInfo{
   // 设备产品名称
@@ -67,7 +68,9 @@ class SystemProfiler{
     this.ownInfo.deviceName = MQTTOption.clientId as string
   }
   getCpuInfo() {
-    this.ownInfo.cpuUsage = Number(testStatisticsApi.getCpu_stat_cpu().split(" ")[0]);
+    //TODO 权限问题
+    // this.ownInfo.cpuUsage = Number(testStatisticsApi.getCpu_stat_cpu().split(" ")[0]);
+    this.ownInfo.cpuUsage = hidebug.getCpuUsage();
   }
   getmemoryInfo(){
     this.ownInfo.memoryUsage =(1 - (Number(testStatisticsApi.getAvailableMem().split(" ")[0]) / Number(testStatisticsApi.getMemTotal().split(" ")[0]))) * 100
