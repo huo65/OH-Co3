@@ -50,29 +50,33 @@ class ModelManager {
 }
 
   async processImage(uri: string): Promise<ArrayBuffer> {
-    const file = fileIo.openSync(uri, fileIo.OpenMode.READ_ONLY);
-    const imageSource = image.createImageSource(file.fd);
-    const pixelMap = await imageSource.createPixelMap();
-    
-    // 图片预处理
-    const info = await pixelMap.getImageInfo();
-    await pixelMap.scale(256.0 / info.size.width, 256.0 / info.size.height);
-    // 修改crop参数类型
-    const cropOptions: CropOptions = {
-      x: 16,
-      y: 16,
-      size: {
-        height: this.modelInputHeight,
-        width: this.modelInputWidth
-      }
-    };
-    await pixelMap.crop(cropOptions);
-    // 获取像素数据
-    const readBuffer = new ArrayBuffer(this.modelInputHeight * this.modelInputWidth * 4);
-    await pixelMap.readPixelsToBuffer(readBuffer);
-    fileIo.closeSync(file);
+    try {
+      const file = fileIo.openSync(uri, fileIo.OpenMode.READ_ONLY);
+      const imageSource = image.createImageSource(file.fd);
+      const pixelMap = await imageSource.createPixelMap();
 
-    return this.normalizeImageData(new Uint8Array(readBuffer));
+      // 图片预处理
+      const info = await pixelMap.getImageInfo();
+      await pixelMap.scale(256.0 / info.size.width, 256.0 / info.size.height);
+      // 修改crop参数类型
+      const cropOptions: CropOptions = {
+        x: 16,
+        y: 16,
+        size: {
+          height: this.modelInputHeight,
+          width: this.modelInputWidth
+        }
+      };
+      await pixelMap.crop(cropOptions);
+      // 获取像素数据
+      const readBuffer = new ArrayBuffer(this.modelInputHeight * this.modelInputWidth * 4);
+      await pixelMap.readPixelsToBuffer(readBuffer);
+      fileIo.closeSync(file);
+      return this.normalizeImageData(new Uint8Array(readBuffer));
+    } catch (error) {
+      console.error("Error processing image:", error);
+    }
+    return this.normalizeImageData(new Uint8Array());
   }
   // 根据接受的参数处理图片
   async processImageWithParam(bitmap: string): Promise<ArrayBuffer> {
