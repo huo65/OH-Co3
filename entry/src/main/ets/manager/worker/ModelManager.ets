@@ -1,8 +1,9 @@
 import image from '@ohos.multimedia.image';
-import fileIo from '@ohos.file.fs';
+// import fileIo from '@ohos.file.fs';
 import modelPredict from './Model';
 import util from '@ohos.util';
 import buffer from '@ohos.buffer';
+import { fileIo } from '@kit.CoreFileKit';
 
 
 // 在文件顶部添加类型定义
@@ -50,8 +51,10 @@ class ModelManager {
 }
 
   async processImage(uri: string): Promise<ArrayBuffer> {
+    let file: fileIo.File | null = null;
     try {
-      const file = fileIo.openSync(uri, fileIo.OpenMode.READ_ONLY);
+      file = fileIo.openSync(uri, fileIo.OpenMode.READ_ONLY);
+      console.error("OpenSuccess")
       const imageSource = image.createImageSource(file.fd);
       const pixelMap = await imageSource.createPixelMap();
 
@@ -71,10 +74,13 @@ class ModelManager {
       // 获取像素数据
       const readBuffer = new ArrayBuffer(this.modelInputHeight * this.modelInputWidth * 4);
       await pixelMap.readPixelsToBuffer(readBuffer);
-      fileIo.closeSync(file);
       return this.normalizeImageData(new Uint8Array(readBuffer));
     } catch (error) {
       console.error("Error processing image:", error);
+    } finally {
+      if (file) {
+        fileIo.closeSync(file); // 确保文件关闭
+      }
     }
     return this.normalizeImageData(new Uint8Array());
   }

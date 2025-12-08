@@ -7,7 +7,7 @@ import { nodeInfoSyn } from '../broker/monitor/NodeInfoSyn';
 import { MQTTOption } from '../broker/MQTTConfig';
 import { hidebug } from '@kit.PerformanceAnalysisKit';
 import { taskpool } from '@kit.ArkTS';
-// TODO 更新接口
+// TODO 更新接口https://docs.openharmony.cn/pages/v6.0/zh-cn/application-dev/reference/apis-performance-analysis-kit/js-apis-hidebug.md#systemmeminfo12
 export class NodeInfo{
   // 设备产品名称
   deviceName: string
