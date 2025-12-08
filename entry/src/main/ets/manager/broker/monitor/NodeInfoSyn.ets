@@ -1,32 +1,31 @@
-import { NodeInfo } from '../../monitor/SystemProfiler'
+import { DeviceInfo } from '../../monitor/SystemProfiler'
 import { MQTTClient } from '../MQTTClient'
 import {MQTTOption} from '../MQTTConfig'
 import HashMap from '@ohos.util.HashMap'
 import deviceInfo from '@ohos.deviceInfo';
 
-
 interface NodeInfoObj {
   deviceName: string;
   score: number;
-  params: NodeInfo
+  params: DeviceInfo
 }
 
 const ownName: string = MQTTOption.clientId as string
 
 class NodeInfoSyn{
 
-  otherNodeInfo:NodeInfo[] = [];
+  otherNodeInfo:DeviceInfo[] = [];
 
 
-  getOtherNodeInfo():HashMap<string,NodeInfo> {
-    let otherInfo:HashMap<string,NodeInfo> = new HashMap<string,NodeInfo>();
+  getOtherNodeInfo():HashMap<string,DeviceInfo> {
+    let otherInfo:HashMap<string,DeviceInfo> = new HashMap<string,DeviceInfo>();
     for (let index = 0; index < this.otherNodeInfo.length; index++) {
       otherInfo.set(this.otherNodeInfo[index].deviceName,this.otherNodeInfo[index])
     }
     return otherInfo;
   }
 
-  sendOwnInfo(nodeInfo: NodeInfo): void {
+  sendOwnInfo(nodeInfo: DeviceInfo): void {
     const MQTTInstance: MQTTClient = MQTTClient.getInstance()
     const message: string = `
     {
@@ -66,8 +65,8 @@ class NodeInfoSyn{
       const newScore:number = nodeInfoObj.score;
 
       if (ownName !== newDeviceName) {
-        const params:NodeInfo = nodeInfoObj.params;
-        const newNodeInfo: NodeInfo = {
+        const params:DeviceInfo = nodeInfoObj.params;
+        const newNodeInfo: DeviceInfo = {
           deviceName: newDeviceName,
           cpuUsage: parseFloat(params.cpuUsage.toFixed(2)),
           memoryUsage: parseFloat(params.memoryUsage.toFixed(2)),

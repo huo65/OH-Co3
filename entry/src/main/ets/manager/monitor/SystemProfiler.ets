@@ -8,7 +8,7 @@ import { MQTTOption } from '../broker/MQTTConfig';
 import { hidebug } from '@kit.PerformanceAnalysisKit';
 import { taskpool } from '@kit.ArkTS';
 // TODO 更新接口https://docs.openharmony.cn/pages/v6.0/zh-cn/application-dev/reference/apis-performance-analysis-kit/js-apis-hidebug.md#systemmeminfo12
-export class NodeInfo{
+export class DeviceInfo{
   // 设备产品名称
   deviceName: string
   // 电池电量百分比
@@ -40,12 +40,12 @@ async function getSystemCpuUsageAsync(): Promise<number> {
 }
 
 class SystemProfiler{
-  private deviceInfos:HashMap<string,NodeInfo> = new HashMap();
-  ownInfo:NodeInfo = new NodeInfo();
-  getDeviceInfos():HashMap<string,NodeInfo>{
-    let otherInfo:HashMap<string,NodeInfo> = this.getOtherInfo();
-    let ownInfo:HashMap<string,NodeInfo> = this.getOwnInfo();
-    let  combinedInfo:HashMap<string,NodeInfo> = new HashMap<string, NodeInfo>();
+  private deviceInfos:HashMap<string,DeviceInfo> = new HashMap();
+  ownInfo:DeviceInfo = new DeviceInfo();
+  getDeviceInfos():HashMap<string,DeviceInfo>{
+    let otherInfo:HashMap<string,DeviceInfo> = this.getOtherInfo();
+    let ownInfo:HashMap<string,DeviceInfo> = this.getOwnInfo();
+    let  combinedInfo:HashMap<string,DeviceInfo> = new HashMap<string, DeviceInfo>();
 
     otherInfo.forEach((value, key) => {
       combinedInfo.set(key, value);
@@ -57,11 +57,11 @@ class SystemProfiler{
     return combinedInfo;
   }
 
-  getOtherInfo():HashMap<string,NodeInfo>{
+  getOtherInfo():HashMap<string,DeviceInfo>{
     return nodeInfoSyn.getOtherNodeInfo()
   }
 
-  getOwnInfo():HashMap<string,NodeInfo>{
+  getOwnInfo():HashMap<string,DeviceInfo>{
     this.getDeviceName()
     this.getCpuInfo()
     this.getmemoryInfo()
