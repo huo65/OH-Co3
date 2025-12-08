@@ -1,9 +1,9 @@
 import { HarmonyInferenceClient, MQTTConfig, InferenceTask, SystemStatus } from '../manager/HarmonyInferenceClient';
 import { DeviceInfo } from '../manager/monitor/SystemProfiler';
 
-@Entry
+// @Entry
 @Component
-struct TestClientPage {
+export struct TestClientPage {
   private client = HarmonyInferenceClient.getInstance();
   private isInitialized: boolean = false;
   private connectionStatus: string = 'Disconnected';

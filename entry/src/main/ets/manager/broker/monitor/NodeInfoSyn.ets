@@ -1,10 +1,9 @@
-import { NodeInfo } from '../../monitor/SystemProfiler'
+import { DeviceInfo } from '../../monitor/SystemProfiler'
 import { MQTTClient } from '../MQTTClient'
 import {MQTTOption} from '../MQTTConfig'
 import HashMap from '@ohos.util.HashMap'
 import deviceInfo from '@ohos.deviceInfo';
 
-const MQTTInstance: MQTTClient = MQTTClient.getInstance()
 interface NodeInfoObj {
   deviceName: string;
   score: number;

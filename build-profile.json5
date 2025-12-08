@@ -6,11 +6,11 @@
         "material": {
           "certpath": "C:/Users/86132/.ohos/config/openharmony/default_OH_Co3_Zml4u516gCnq1V9aer0eq283S63wnRY4wX9T_uhU8tg=.cer",
           "keyAlias": "debugKey",
-          "keyPassword": "0000001B82AA326D7147F3897C9D60A84F5A22FD264DABEE497AF3B00B744E42D42DFFAFF6F56525CF70B5",
+          "keyPassword": "0000001BB43C2199CDC3297433B8B4F44A27E2D60E6EC968EDE5E649DF99D106EF79CD41197227151120BE",
           "profile": "C:/Users/86132/.ohos/config/openharmony/default_OH_Co3_Zml4u516gCnq1V9aer0eq283S63wnRY4wX9T_uhU8tg=.p7b",
           "signAlg": "SHA256withECDSA",
           "storeFile": "C:/Users/86132/.ohos/config/openharmony/default_OH_Co3_Zml4u516gCnq1V9aer0eq283S63wnRY4wX9T_uhU8tg=.p12",
-          "storePassword": "0000001B96177E73145B9536F16B77783F799A709141485F6FDE7185FFB17107C26BEA54BDFE265A50CC03"
+          "storePassword": "0000001B6DA52C20AE345BBE2CD04BF4F67BE0ACDDA59429EE3CC5B068ABAE1181B11B0A3A3E80D153A1FC"
         }
       }
     ],
@@ -21,7 +21,7 @@
         "compileSdkVersion": "20",
         "compatibleSdkVersion": "20",
         "runtimeOS": "OpenHarmony",
-        "targetSdkVersion":20
+        "targetSdkVersion": 20
       }
     ],
     "buildModeSet": [

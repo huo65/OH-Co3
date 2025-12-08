@@ -1,6 +1,7 @@
 import { Performance } from './tabs/PerformanceScreen'
 import {MindSpore} from './tabs/MindScopeScreen'
 import { MqttClientScreen } from './tabs/BrokerScreen'
+import { TestClientPage } from './TestClientPage'
 
 // import {MQTT} from './Tabs/MQTT'
 // C:\Users\86132\AppData\Local\Huawei\Sdk\hmscore\emulator
@@ -49,20 +50,21 @@ struct Index {
   build() {
     Tabs({ index: this.currentIndex, barPosition: BarPosition.End }) {
       TabContent() {
-        Performance()
+        // Performance()
+        TestClientPage()
       }
       .tabBar(this.TabBuilder('性能', 0, $r('app.media.xn'), $r('app.media.xn2')))
 
-      TabContent() {
-        MindSpore()
-      }
-      .tabBar(this.TabBuilder('推理', 1, $r('app.media.tl'), $r('app.media.tl2')))
-
-      TabContent() {
-        // MQTT()
-        MqttClientScreen()
-      }
-      .tabBar(this.TabBuilder('通信', 2, $r('app.media.app_icon'), $r('app.media.app_icon')))
+      // TabContent() {
+      //   MindSpore()
+      // }
+      // .tabBar(this.TabBuilder('推理', 1, $r('app.media.tl'), $r('app.media.tl2')))
+      //
+      // TabContent() {
+      //   // MQTT()
+      //   MqttClientScreen()
+      // }
+      // .tabBar(this.TabBuilder('通信', 2, $r('app.media.app_icon'), $r('app.media.app_icon')))
     }
     .barMode(BarMode.Fixed) // 默认值 Fixed
     .scrollable(false) // 限制滑动
