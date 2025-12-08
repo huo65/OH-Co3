@@ -96,7 +96,35 @@ class HarmonyInferenceClient {
     }
     return HarmonyInferenceClient.instance;
   }
+  // TODO 进一步完善
+  // 初始化事件监听器
+  private initEventListeners(): void {
+    // 监听任务结果事件
+    emitter.on({
+      eventId: RESULT_EVENT_ID,
+      priority: emitter.EventPriority.LOW
+    }, (eventData) => {
+      this.handleTaskResult(eventData.data?.content);
+    });
+  }
 
+
+
+  // 注册设备状态更新回调
+  public registerDeviceStatusCallback(callback: DeviceStatusCallback): void {
+    this.deviceStatusCallbacks.add(callback);
+    // 立即调用一次回调，提供当前状态
+    callback(this.getSystemStatus());
+  }
+
+  // 注销设备状态更新回调
+  public unregisterDeviceStatusCallback(callback: DeviceStatusCallback): void {
+    this.deviceStatusCallbacks.delete(callback);
+  }
+
+
+
+  // ####----------------------------------@初始化与注销（连接）@----------------------------------####
   // 初始化方法
   public async init(config: MQTTConfig, modelName: string): Promise<boolean> {
     if (this.isInitialized) {
@@ -131,13 +159,51 @@ class HarmonyInferenceClient {
       return false;
     }
   }
+  // 释放资源
+  public async destroy(): Promise<void> {
+    if (!this.isInitialized) {
+      return;
+    }
 
+    try {
+      // 关闭MQTT连接
+      if (this.mqttClient) {
+        await this.mqttClient.destroy();
+        this.mqttClient = null;
+      }
+
+      // 清空任务回调和状态
+      this.taskCallbacks.clear();
+      this.taskStatusMap.clear();
+      this.deviceStatusCallbacks.clear();
+
+      // 移除事件监听器
+      emitter.off(RESULT_EVENT_ID);
+
+      this.isInitialized = false;
+      console.info('HarmonyInferenceClient destroyed successfully');
+    } catch (error) {
+      console.error('HarmonyInferenceClient destruction failed:', error);
+      const errorMsg = error instanceof Error ? error.message : String(error);
+      throw new Error(errorMsg);
+    }
+  }
+
+  // 检查连接状态
+  public async isConnected(): Promise<boolean> {
+    if (!this.mqttClient) {
+      return false;
+    }
+    return await this.mqttClient.isCon();
+  }
+
+  // ####----------------------------------@状态信息获取与同步@----------------------------------####
   // 启动设备状态同步
   private startDeviceStatusSync(): void {
     // 设备状态同步由SystemProfiler和NodeInfoSyn模块自动处理
     // 这里不需要额外的代码，只需要确保这些模块正常工作
     console.info('Device status sync started');
-    
+
     // 定期更新设备状态
     setInterval(() => {
       this.updateDeviceStatus();
@@ -155,18 +221,45 @@ class HarmonyInferenceClient {
       }
     });
   }
-  // TODO 进一步完善
-  // 初始化事件监听器
-  private initEventListeners(): void {
-    // 监听任务结果事件
-    emitter.on({
-      eventId: RESULT_EVENT_ID,
-      priority: emitter.EventPriority.LOW
-    }, (eventData) => {
-      this.handleTaskResult(eventData.data?.content);
-    });
+  // 获取全局系统状态视图
+  public getSystemStatus(): SystemStatus {
+
+    const allDevicesMap = systemProfiler.getDeviceInfos();
+    const ownInfo = systemProfiler.getOwnInfo();
+    const otherDevicesMap =systemProfiler.getOtherInfo();
+
+    return {
+      ownDevice: ownInfo,
+      otherDevices: otherDevicesMap,
+      allDevices: allDevicesMap
+    };
   }
 
+  // 获取所有设备信息
+  public getAllDevices(): HashMap<string, DeviceInfo> {
+    const deviceInfos = systemProfiler.getDeviceInfos();
+    return deviceInfos;
+  }
+  // 获取指定设备信息
+  public getDeviceInfo(deviceName: string): DeviceInfo | undefined {
+    const deviceInfos = systemProfiler.getDeviceInfos();
+    const nodeInfo = deviceInfos.get(deviceName);
+    if (nodeInfo) {
+      return nodeInfo;
+    }
+    return undefined;
+  }
+
+  // ####----------------------------------@任务处理@----------------------------------####
+  // 获取任务状态
+  public getTaskStatus(taskId: string): TaskStatus | undefined {
+    return this.taskStatusMap.get(taskId);
+  }
+
+  // 获取所有任务状态
+  public getAllTaskStatus(): Map<string, TaskStatus> {
+    return new Map(this.taskStatusMap);
+  }
   // 处理任务结果
   private handleTaskResult(resultData: string): void {
     try {
@@ -222,7 +315,7 @@ class HarmonyInferenceClient {
             taskId,
             status: 'pending'
           });
-          
+
           // 设置超时处理
           setTimeout(() => {
             if (this.taskCallbacks.has(taskId)) {
@@ -246,28 +339,6 @@ class HarmonyInferenceClient {
     }
   }
 
-  // 注册设备状态更新回调
-  public registerDeviceStatusCallback(callback: DeviceStatusCallback): void {
-    this.deviceStatusCallbacks.add(callback);
-    // 立即调用一次回调，提供当前状态
-    callback(this.getSystemStatus());
-  }
-
-  // 注销设备状态更新回调
-  public unregisterDeviceStatusCallback(callback: DeviceStatusCallback): void {
-    this.deviceStatusCallbacks.delete(callback);
-  }
-
-  // 获取任务状态
-  public getTaskStatus(taskId: string): TaskStatus | undefined {
-    return this.taskStatusMap.get(taskId);
-  }
-
-  // 获取所有任务状态
-  public getAllTaskStatus(): Map<string, TaskStatus> {
-    return new Map(this.taskStatusMap);
-  }
-
   // 取消任务
   public cancelTask(taskId: string): boolean {
     const callback = this.taskCallbacks.get(taskId);
@@ -283,74 +354,6 @@ class HarmonyInferenceClient {
       return true;
     }
     return false;
-  }
-
-  // 获取全局系统状态视图
-  public getSystemStatus(): SystemStatus {
-
-    const allDevicesMap = systemProfiler.getDeviceInfos();
-    const ownInfo = systemProfiler.getOwnInfo();
-    const otherDevicesMap =systemProfiler.getOtherInfo();
-    
-    return {
-      ownDevice: ownInfo,
-      otherDevices: otherDevicesMap,
-      allDevices: allDevicesMap
-    };
-  }
-
-  // 获取指定设备信息
-  public getDeviceInfo(deviceName: string): DeviceInfo | undefined {
-    const deviceInfos = systemProfiler.getDeviceInfos();
-    const nodeInfo = deviceInfos.get(deviceName);
-    if (nodeInfo) {
-      return nodeInfo;
-    }
-    return undefined;
-  }
-
-  // 获取所有设备信息
-  public getAllDevices(): HashMap<string, DeviceInfo> {
-    const deviceInfos = systemProfiler.getDeviceInfos();
-    return deviceInfos;
-  }
-
-  // 释放资源
-  public async destroy(): Promise<void> {
-    if (!this.isInitialized) {
-      return;
-    }
-
-    try {
-      // 关闭MQTT连接
-      if (this.mqttClient) {
-        await this.mqttClient.destroy();
-        this.mqttClient = null;
-      }
-
-      // 清空任务回调和状态
-      this.taskCallbacks.clear();
-      this.taskStatusMap.clear();
-      this.deviceStatusCallbacks.clear();
-
-      // 移除事件监听器
-      emitter.off(RESULT_EVENT_ID);
-
-      this.isInitialized = false;
-      console.info('HarmonyInferenceClient destroyed successfully');
-    } catch (error) {
-      console.error('HarmonyInferenceClient destruction failed:', error);
-      const errorMsg = error instanceof Error ? error.message : String(error);
-      throw new Error(errorMsg);
-    }
-  }
-
-  // 检查连接状态
-  public async isConnected(): Promise<boolean> {
-    if (!this.mqttClient) {
-      return false;
-    }
-    return await this.mqttClient.isCon();
   }
 
 }
