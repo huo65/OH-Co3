@@ -16,7 +16,7 @@ interface TaskResultObj{
 interface ResultInfo{
   result:string
 }
-
+// TODO 需要改造
 class TaskInfo {
   taskId: string;
   fromClient: string;
@@ -82,7 +82,7 @@ class TaskDispatch{
     // TODO 注意重复处理
     if (taskInfo.toClient == ownName) {
     //   做一个任务队列，避免阻塞，同时可以扩展任务流转
-      GlobalTaskManager.getQueue().addTask(taskInfo);
+    //   GlobalTaskManager.getQueue().addTask(taskInfo);
 
     }
 

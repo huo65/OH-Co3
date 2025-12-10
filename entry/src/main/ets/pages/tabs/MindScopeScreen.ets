@@ -264,21 +264,21 @@ export struct MindSpore {
         this.logMessages.push('[2/6] 已选择图片: ' + photoSelectResult.photoUris[0]);
         this.uris = photoSelectResult.photoUris;
         // 执行计算调度
-        if (SchedulerInstance.workScheduler(this.uris[0], this.logMessages)){
-          try {
-            this.logMessages.push('[4/6] 本地执行开始图片预处理...');
-            const processedImage = await ModelManagerInstance.processImage(this.uris[0]);
-            this.logMessages.push('[5/6] 开始模型推理...');
-
-            const predictResult = await ModelManagerInstance.predictWithTopResults([processedImage]);
-            this.logMessages.push('[6/6] 推理完成');
-            console.info('=========MS_LITE_LOG END=========');
-            resolve(predictResult);
-          } catch (e) {
-            this.logMessages.push('[ERROR] 流程异常: ' + e.message);
-            reject(e);
-          }
-        }
+        // if (SchedulerInstance.workScheduler(this.uris[0], this.logMessages)){
+        //   try {
+        //     this.logMessages.push('[4/6] 本地执行开始图片预处理...');
+        //     const processedImage = await ModelManagerInstance.processImage(this.uris[0]);
+        //     this.logMessages.push('[5/6] 开始模型推理...');
+        //
+        //     const predictResult = await ModelManagerInstance.predictWithTopResults([processedImage]);
+        //     this.logMessages.push('[6/6] 推理完成');
+        //     console.info('=========MS_LITE_LOG END=========');
+        //     resolve(predictResult);
+        //   } catch (e) {
+        //     this.logMessages.push('[ERROR] 流程异常: ' + e.message);
+        //     reject(e);
+        //   }
+        // }
       });
     });
   }

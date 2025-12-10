@@ -5,14 +5,14 @@ import { DeviceInfo, systemProfiler } from '../monitor/SystemProfiler';
 import systemDateTime from '@ohos.systemDateTime';
 import { paramSyn } from '../broker/paramOpt/ParamSyn';
 import { ModelManager } from '../../manager/worker/ModelManager';
+import { InferenceTask, InferenceInputType } from '../worker/InferenceWorker';
 const ModelManagerInstance: ModelManager = ModelManager.getInstance()
 class Scheduler{
   private static SchedulerInstance: Scheduler
-  // private modelManager: ModelManager = new ModelManager();
-
 
   private deviceInfos:HashMap<string,DeviceInfo> = new HashMap();
-  workScheduler(uri:string, logMessages: Array<string>):Boolean{
+
+  workScheduler(task: InferenceTask, logMessages: Array<string>):Boolean{
     logMessages.push('[3/6] 调度处理')
     this.deviceInfos =  systemProfiler.getDeviceInfos();
 
@@ -33,6 +33,11 @@ class Scheduler{
       console.log(`Highest score node id: ${highestScoreNode[0]}, Score: ${this.calculate_score(highestScoreNode[1])}`);
       if (highestScoreNode[0] != ownName) {
         logMessages.push('[4/6] 任务发送到其他节点')
+        // TODO 配套处理任务发送与接收
+        let uri = '';
+        // if (task.type === InferenceInputType.IMAGE && typeof task.data === 'object' && 'uri' in task.data) {
+        //   uri = task.data.uri;
+        // }
         this.dispatchTask(uri, highestScoreNode[0])
         logMessages.push('[5/6] 任务发送成功')
         return false

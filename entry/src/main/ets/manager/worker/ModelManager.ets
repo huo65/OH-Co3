@@ -4,6 +4,8 @@ import modelPredict from './Model';
 import util from '@ohos.util';
 import buffer from '@ohos.buffer';
 import { fileIo } from '@kit.CoreFileKit';
+import { InferenceWorker, InferenceInput, InferenceResult, InferenceInputType, ImageInputData,
+  InferenceTask } from './InferenceWorker';
 
 
 // 在文件顶部添加类型定义
@@ -26,12 +28,12 @@ interface PredictResult {
     val: number;
     idx: number;
   }
-class ModelManager {
+class ModelManager implements InferenceWorker {
   private static instance: ModelManager
   private modelBuffer: ArrayBuffer = new ArrayBuffer(0);
   private modelInputHeight: number = 224;
   private modelInputWidth: number = 224;
-  private isInit: Boolean = false;
+  private isInit: boolean = false;
   // 静态方法获取唯一实例
   public static getInstance(): ModelManager {
     if (!ModelManager.instance) {
@@ -51,11 +53,10 @@ class ModelManager {
 }
 
   async processImage(uri: string): Promise<ArrayBuffer> {
-    let file: fileIo.File | null = null;
     try {
-      file = fileIo.openSync(uri, fileIo.OpenMode.READ_ONLY);
-      console.error("OpenSuccess")
-      const imageSource = image.createImageSource(file.fd);
+      const resourceManager = getContext().getApplicationContext().resourceManager;
+      const fileData = await resourceManager.getMediaContent($r('app.media.dog'));
+      const imageSource = image.createImageSource(fileData.buffer);
       const pixelMap = await imageSource.createPixelMap();
 
       // 图片预处理
@@ -76,11 +77,18 @@ class ModelManager {
       await pixelMap.readPixelsToBuffer(readBuffer);
       return this.normalizeImageData(new Uint8Array(readBuffer));
     } catch (error) {
-      console.error("Error processing image:", error);
+      console.error("Error details:",
+        JSON.stringify({
+          message: error.message,
+          code: error.code,
+          stack: error.stack
+        }));
     } finally {
-      if (file) {
-        fileIo.closeSync(file); // 确保文件关闭
-      }
+      // let file: fileIo.File | null = null;
+      // file = fileIo.openSync(uri, fileIo.OpenMode.READ_ONLY);
+      // if (file) {
+      //   fileIo.closeSync(file); // 确保文件关闭
+      // }
     }
     return this.normalizeImageData(new Uint8Array());
   }
@@ -192,7 +200,42 @@ class ModelManager {
       .map(item => item.idx)
   }
 
+  // 实现InferenceWorker接口的infer方法，接受InferenceTask参数
+  async infer(task: InferenceTask): Promise<InferenceResult> {
+    if (!this.isInit) {
+      return {
+        success: false,
+        message: 'Model not initialized'
+      };
+    }
+    
+    let processedData: ArrayBuffer;
+    
+    // 处理输入
+    if (task.type === InferenceInputType.IMAGE) {
+      let imageData = task.data as ImageInputData;
+      processedData = await this.processImage(imageData.uri);
+    } else {
+      // 类型不匹配
+      return {
+        success: false,
+        message: `Unsupported input type: ${task.type}`
+      };
+    }
+    
+    let predictResult = await this.predictWithTopResults([processedData]);
+    
+    return {
+      success: true,
+      maxArray: predictResult.maxArray,
+      maxIndexArray: predictResult.maxIndexArray
+    };
+  }
 
+  // 实现InferenceWorker接口的isInitialized方法
+  isInitialized(): boolean {
+    return this.isInit;
+  }
 
   base64ToPixelMap(base64: string): Promise<image.PixelMap> {
     //将原始图片base64字符串转变为通过base64字符串

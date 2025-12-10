@@ -2,6 +2,8 @@ import { MQTTClient, MQTTOptionsType } from './broker/MQTTClient';
 import { MqttQos } from '@ohos/mqtt';
 import { Scheduler } from './scheduler/Scheduler';
 import { ModelManager } from './worker/ModelManager';
+import { InferenceWorker, InferenceTask, InferenceResult } from './worker/InferenceWorker';
+import { GlobalTaskManager } from './worker/GlobalTaskManager';
 import { DeviceInfo, systemProfiler } from './monitor/SystemProfiler';
 import HashMap from '@ohos.util.HashMap';
 import emitter from '@ohos.events.emitter';
@@ -17,28 +19,6 @@ export interface MQTTConfig {
   password?: string;
   topic?: string;
   qos?: MqttQos;
-}
-
-// // 设备信息类型
-// export interface DeviceInfo {
-//   deviceName: string;
-//   batteryLevel: number;
-//   memoryUsage: number;
-//   cpuUsage: number;
-//   storageFree: number;
-//   score: number;
-// }
-
-// 推理任务参数类型
-export interface InferenceTask {
-  imageUri: string;
-  modelName?: string;
-}
-
-// 推理结果类型
-export interface InferenceResult {
-  maxArray: number[];
-  maxIndexArray: number[];
 }
 
 // 系统状态类型
@@ -74,7 +54,9 @@ class HarmonyInferenceClient {
   private static instance: HarmonyInferenceClient;
   private mqttClient: MQTTClient | null = null;
   private scheduler: Scheduler;
-  private modelManager: ModelManager;
+  private worker: InferenceWorker;
+  // TODO 封装时考虑删除
+  private defaultWorker: ModelManager;
   private isInitialized: boolean = false;
   private modelName: string = '';
   //存疑
@@ -85,7 +67,8 @@ class HarmonyInferenceClient {
   // 私有构造函数
   private constructor() {
     this.scheduler = Scheduler.getInstance();
-    this.modelManager = ModelManager.getInstance();
+    this.defaultWorker = ModelManager.getInstance();
+    this.worker = this.defaultWorker;
     // this.initEventListeners();
   }
 
@@ -126,7 +109,7 @@ class HarmonyInferenceClient {
 
   // ####----------------------------------@初始化与注销（连接）@----------------------------------####
   // 初始化方法
-  public async init(config: MQTTConfig, modelName: string): Promise<boolean> {
+  public async init(config: MQTTConfig, modelName: string, customWorker?: InferenceWorker): Promise<boolean> {
     if (this.isInitialized) {
       return true;
     }
@@ -145,9 +128,19 @@ class HarmonyInferenceClient {
       this.mqttClient = MQTTClient.getNewInstance(mqttOptions);
       await this.mqttClient.init();
 
+      // 使用自定义Worker或默认Worker
+      if (customWorker) {
+        this.worker = customWorker;
+      } else {
+        this.worker = this.defaultWorker;
+      }
+
       // 初始化模型
-      await this.modelManager.initModel(modelName);
+      await this.worker.initModel(modelName);
       this.modelName = modelName;
+
+      // 初始化全局任务队列
+      GlobalTaskManager.init(this.worker);
 
       // 启动设备状态同步
       this.startDeviceStatusSync();
@@ -170,6 +163,11 @@ class HarmonyInferenceClient {
       if (this.mqttClient) {
         await this.mqttClient.destroy();
         this.mqttClient = null;
+      }
+
+      // 释放Worker资源
+      if (this.worker.release) {
+        await this.worker.release();
       }
 
       // 清空任务回调和状态
@@ -285,7 +283,7 @@ class HarmonyInferenceClient {
     }
   }
 
-  // 提交推理任务
+  // 提交推理任务，只接受InferenceTask类型
   public async submitTask(task: InferenceTask): Promise<InferenceResult> {
     if (!this.isInitialized) {
       throw new Error('HarmonyInferenceClient is not initialized');
@@ -294,13 +292,15 @@ class HarmonyInferenceClient {
     try {
       // 使用调度器处理任务
       const logMessages: string[] = [];
-      const shouldExecuteLocally = this.scheduler.workScheduler(task.imageUri, logMessages);
+      const shouldExecuteLocally = this.scheduler.workScheduler(
+        task, 
+        logMessages
+      );
 
       if (shouldExecuteLocally) {
-        // 本地执行推理
-        console.info('Executing inference locally');
-        const processedImage = await this.modelManager.processImage(task.imageUri);
-        const result = await this.modelManager.predictWithTopResults([processedImage]);
+        // 本地执行推理，添加到全局任务队列
+        console.info('Adding inference task to local queue');
+        const result = await GlobalTaskManager.getQueue().addTask(task);
         return result;
       } else {
         // 任务已发送到其他设备，需要等待结果
@@ -358,4 +358,4 @@ class HarmonyInferenceClient {
 
 }
 
-export { HarmonyInferenceClient };
+export { HarmonyInferenceClient, InferenceTask };

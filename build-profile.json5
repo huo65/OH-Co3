@@ -6,11 +6,11 @@
         "material": {
           "certpath": "C:/Users/86132/.ohos/config/openharmony/default_OH_Co3_Zml4u516gCnq1V9aer0eq283S63wnRY4wX9T_uhU8tg=.cer",
           "keyAlias": "debugKey",
-          "keyPassword": "0000001BB43C2199CDC3297433B8B4F44A27E2D60E6EC968EDE5E649DF99D106EF79CD41197227151120BE",
+          "keyPassword": "0000001B37FDC00FA41DE631B9EC6B0B998EFE67D30FEEB7263206B248F52AF0030C2E7C3F0DD18AE46F7C",
           "profile": "C:/Users/86132/.ohos/config/openharmony/default_OH_Co3_Zml4u516gCnq1V9aer0eq283S63wnRY4wX9T_uhU8tg=.p7b",
           "signAlg": "SHA256withECDSA",
           "storeFile": "C:/Users/86132/.ohos/config/openharmony/default_OH_Co3_Zml4u516gCnq1V9aer0eq283S63wnRY4wX9T_uhU8tg=.p12",
-          "storePassword": "0000001B6DA52C20AE345BBE2CD04BF4F67BE0ACDDA59429EE3CC5B068ABAE1181B11B0A3A3E80D153A1FC"
+          "storePassword": "0000001BDA2F06C365304FEEA6F4B3F78CEACC624FB31CFAB8872AF50FB1F74C9E88AE98C90A3997617BA1"
         }
       }
     ],

@@ -1,5 +1,6 @@
 import { HarmonyInferenceClient, MQTTConfig, InferenceTask, SystemStatus } from '../manager/HarmonyInferenceClient';
 import { DeviceInfo } from '../manager/monitor/SystemProfiler';
+import { InferenceInputType } from '../manager/worker/InferenceWorker';
 
 // @Entry
 @Component
@@ -23,8 +24,15 @@ export struct TestClientPage {
 
   // 测试任务
   private testTask: InferenceTask = {
-    imageUri: '', // 需要替换为实际的图片URI
-    modelName: 'model.ms'
+    taskId: `task-${Date.now()}`,
+    modelName: 'image-model.ms',
+    type: InferenceInputType.IMAGE,
+    data: {
+      uri: ''
+    },
+    params: {
+      "maxResults": 5
+    }
   };
   // 在组件外定义计算属性
   get deviceList(): Array<[string, DeviceInfo]> {
@@ -42,7 +50,7 @@ export struct TestClientPage {
       Button('Initialize Client')
         .onClick(async () => {
           this.log('Initializing client...');
-          const result = await this.client.init(this.mqttConfig, 'model.ms');
+          const result = await this.client.init(this.mqttConfig, 'mobilenetv2.ms');
           this.isInitialized = result;
           this.connectionStatus = result ? 'Connected' : 'Failed';
           this.log(`Initialization ${result ? 'success' : 'failed'}`);
