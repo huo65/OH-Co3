@@ -1,16 +1,24 @@
 import { HarmonyInferenceClient, MQTTConfig, InferenceTask, SystemStatus } from '../manager/HarmonyInferenceClient';
 import { DeviceInfo } from '../manager/monitor/SystemProfiler';
 import { InferenceInputType } from '../manager/worker/InferenceWorker';
+import { SelectTitleBar } from '@kit.ArkUI';
+interface UsageItem {
+  icon: Resource
+  name: string
+  value: string
+  unit: string
+}
 
 // @Entry
 @Component
 export struct TestClientPage {
   private client = HarmonyInferenceClient.getInstance();
   private isInitialized: boolean = false;
-  private connectionStatus: string = 'Disconnected';
-  private systemStatus: SystemStatus | null = null;
+  @State connectionStatus: string = 'Disconnected';
   private testResult: string = '';
+  @State
   private logMessages: string[] = [];
+  @State systemStatus: SystemStatus | null = null;
 
   // MQTT配置
   private mqttConfig: MQTTConfig = {
@@ -28,18 +36,16 @@ export struct TestClientPage {
     modelName: 'image-model.ms',
     type: InferenceInputType.IMAGE,
     data: {
+      // 默认使用entry/src/main/resources/base/media/dog.jpg
       uri: ''
     },
     params: {
       "maxResults": 5
     }
   };
-  // 在组件外定义计算属性
-  get deviceList(): Array<[string, DeviceInfo]> {
-    return Array.from(this.systemStatus?.allDevices.entries());
-  }
 
   build() {
+    Scroll() {
     Column() {
       Text('Harmony Inference Client Test').fontSize(24).fontWeight(FontWeight.Bold)
       
@@ -68,27 +74,23 @@ export struct TestClientPage {
       Button('Get System Status')
         .onClick(() => {
           this.systemStatus = this.client.getSystemStatus();
-          this.log('System status retrieved');
+          this.log('System status update');
         })
       
       // 显示系统状态
       if (this.systemStatus) {
         Text('System Status:').fontSize(18).fontWeight(FontWeight.Bold)
-        // Text(`Own Device: ${this.systemStatus.ownDevice.deviceName}`)
-        // Text(`Other Devices: ${this.systemStatus.otherDevices.size}`)
-        // Text(`All Devices: ${this.systemStatus.allDevices.size}`)
-        
-        // 显示所有设备信息
-        Scroll() {
+        // 所有设备展示
+        Text('All Devices:').margin({ top: 8 }).fontColor(0x333333)
+        ForEach(Array.from(this.systemStatus.allDevices.values()), (device: DeviceInfo) => {
           Column() {
-            ForEach(
-              this.deviceList, // 确保是 Array<[string, DeviceInfo]> 类型
-              // (item: [string, DeviceInfo]) => item, // 使用数组第一个元素（name）作为键
-              (item: [string, DeviceInfo]) =>
-              Text(`${item}`)
-            )
-          }
-        }.height(200).width('100%').backgroundColor('#f0f0f0')
+            Text(`设备名称：${device.deviceName}`).fontSize(14)
+            Text(`电池：${device.batteryLevel.toFixed(2)}%`).fontColor(0x666666)
+            Text(`内存占用：${device.memoryUsage.toFixed(2)}%`).fontColor(0x666666)
+            Text(`CPU占用：${device.cpuUsage.toFixed(2)}%`).fontColor(0x666666)
+            Text(`存储剩余：${device.storageFree.toFixed(2)}%`).fontColor(0x666666)
+          }.padding({ left: 16 })
+        })
       }
       
       // 提交任务按钮
@@ -135,7 +137,8 @@ export struct TestClientPage {
       }.height(200).width('100%').backgroundColor('#f0f0f0')
     }
     .padding(20)
-    .width('100%')
+    .constraintSize({ minHeight: '100%' })
+    }
     .height('100%')
   }
 

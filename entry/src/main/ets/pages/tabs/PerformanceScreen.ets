@@ -112,20 +112,6 @@ export struct Performance {
             },
             hidesBackButton: true
           })
-        // test
-        // Divider().height(2).color(0xCCCCCC)
-        // SelectTitleBar({
-        //   options: [
-        //     { value: '所有照片' },
-        //     { value: '本地（设备）' },
-        //     { value: '本地本地本地本地本地（储存卡）' }
-        //   ],
-        //   selected: 0,
-        //   onSelected: (index) => promptAction.showToast({ message: 'page index ' + index }),
-        //   hidesBackButton: true
-        // })
-
-
         // 硬件信息
         Column() {
           // 标题
