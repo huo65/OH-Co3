@@ -1,12 +1,12 @@
 import batteryInfo from '@ohos.batteryInfo';
 import statfs from '@ohos.file.statvfs';
 import HashMap from '@ohos.util.HashMap';
-import testStatisticsApi from 'libentry.so';
+import GetSystemInfo from 'libentry.so';
 import { nodeInfoSyn } from '../broker/monitor/NodeInfoSyn';
 import { MQTTOption } from '../broker/MQTTConfig';
 import { hidebug } from '@kit.PerformanceAnalysisKit';
 import { taskpool } from '@kit.ArkTS';
-// TODO 更新接口https://docs.openharmony.cn/pages/v6.0/zh-cn/application-dev/reference/apis-performance-analysis-kit/js-apis-hidebug.md#systemmeminfo12
+// API12之后系统接口新增了一系列获取系统信息的接口，这里为兼容旧版本内存信息获取依旧使用NDK https://docs.openharmony.cn/pages/v6.0/zh-cn/application-dev/reference/apis-performance-analysis-kit/js-apis-hidebug.md#systemmeminfo12
 export class DeviceInfo{
   // 设备产品名称
   deviceName: string
@@ -85,7 +85,7 @@ class SystemProfiler{
     }
   }
   getMemoryInfo(){
-    this.ownInfo.memoryUsage =(1 - (Number(testStatisticsApi.getAvailableMem().split(" ")[0]) / Number(testStatisticsApi.getMemTotal().split(" ")[0]))) * 100
+    this.ownInfo.memoryUsage =(1 - (Number(GetSystemInfo.getAvailableMem().split(" ")[0]) / Number(GetSystemInfo.getMemTotal().split(" ")[0]))) * 100
   }
 
   getStatfsInfo() {

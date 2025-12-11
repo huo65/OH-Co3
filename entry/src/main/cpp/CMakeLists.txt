@@ -9,5 +9,5 @@ set(CMAKE_STRIP_OPTIONS "--strip-debug")  # 或完全禁用：set(CMAKE_STRIP_CO
 include_directories(${NATIVERENDER_ROOT_PATH}
                     ${NATIVERENDER_ROOT_PATH}/include)
 
-add_library(entry SHARED napi_init.cpp TestStatisticsInfo.cpp)
+add_library(entry SHARED napi_init.cpp GetSystemInfo.cpp)
 target_link_libraries(entry PUBLIC libhilog_ndk.z.so libace_napi.z.so)

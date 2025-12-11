@@ -1,16 +1,17 @@
 #include "napi/native_api.h"
-#include "TestStatisticsInfo.h"
+#include "GetSystemInfo.h"
 #include "common/plugin_common.h"
 
 
 EXTERN_C_START
 static napi_value Init(napi_env env, napi_value exports) {
-    bool ret = TestStatisticsInfo::Export(env, exports);
-    if (!ret) {
-        LOGE("napi_value Init failed");
-    } else {
-        LOGD("napi_value Init success");
-    }
+    napi_property_descriptor desc[] = {
+        { "getCpuCount", nullptr, GetSystemInfo::GetCpuCount, nullptr, nullptr, nullptr, napi_default, nullptr },
+        { "getMemTotal", nullptr, GetSystemInfo::GetMemTotal, nullptr, nullptr, nullptr, napi_default, nullptr },
+        { "getAvailableMem", nullptr, GetSystemInfo::GetAvailableMem, nullptr, nullptr, nullptr, napi_default, nullptr },
+        { "getCpuUsage", nullptr, GetSystemInfo::GetCpu_stat_cpu, nullptr, nullptr, nullptr, napi_default, nullptr }
+    };
+    napi_define_properties(env, exports, sizeof(desc) / sizeof(desc[0]), desc);
     return exports;
 }
 EXTERN_C_END

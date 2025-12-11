@@ -1,6 +1,5 @@
-#include "TestStatisticsInfo.h"
+#include "GetSystemInfo.h"
 #include <set>
-#include <unistd.h>
 #include <fstream>
 #include <string>
 #include <sstream>
@@ -10,70 +9,12 @@
 const int GLOBAL_RESMGR = 0xFF00;
 const char *TAG = "[Sample_rawfile]";
 
-std::map<std::string, std::string> TestStatisticsInfo::_MemInfoMap;
+std::map<std::string, std::string> GetSystemInfo::_MemInfoMap;
 
-std::map<std::string, std::string> TestStatisticsInfo::_Cpu_stat;
+std::map<std::string, std::string> GetSystemInfo::_Cpu_stat;
 
-bool TestStatisticsInfo::Export(napi_env env, napi_value exports) {
-    if ((nullptr == env) || (nullptr == exports)) {
-        LOGE("PluginRender::Export: env or exports is null");
-        return false;
-    }
-    napi_property_descriptor desc[] = {
-        DECLARE_NAPI_FUNCTION("getCpuCount", TestStatisticsInfo::GetCpuCount),
-        DECLARE_NAPI_FUNCTION("getMemTotal", TestStatisticsInfo::GetMemTotal),
-        DECLARE_NAPI_FUNCTION("getCachedMem", TestStatisticsInfo::GetCachedMem),
-        DECLARE_NAPI_FUNCTION("getCpuInfo", TestStatisticsInfo::GetCpuInfo),
-        DECLARE_NAPI_FUNCTION("getMemoryInfo", TestStatisticsInfo::GetMemoryInfo),
-        DECLARE_NAPI_FUNCTION("getAvailableMem", TestStatisticsInfo::GetAvailableMem),
-        DECLARE_NAPI_FUNCTION("getCpu_stat_cpu", TestStatisticsInfo::GetCpu_stat_cpu)
-    };
 
-    if (napi_ok != napi_define_properties(env, exports, sizeof(desc) / sizeof(desc[0]), desc)) {
-        LOGE("PluginRender::Export: napi_define_properties failed");
-        return false;
-    }
-    return true;
-}
-
-napi_value TestStatisticsInfo::GetMemoryInfo(napi_env env, napi_callback_info info) {
-    if ((nullptr == env) || (nullptr == info)) {
-        LOGE("TestStatisticsInfo::copyFile: env or info is null");
-        return nullptr;
-    }
-
-    napi_value thisArg;
-    if (napi_ok != napi_get_cb_info(env, info, nullptr, nullptr, &thisArg, nullptr)) {
-        LOGE("TestStatisticsInfo::copyFile: napi_get_cb_info fail");
-        return nullptr;
-    }
-
-    if (getMemoryInfo()) {
-        LOGI("getMemoryInfo success");
-    }
-    return nullptr;
-}
-
-napi_value TestStatisticsInfo::GetCpuInfo(napi_env env, napi_callback_info info) {
-    LOGI("GetCpuInfo");
-    if ((nullptr == env) || (nullptr == info)) {
-        LOGE("TestStatisticsInfo::GetCpuInfo: env or info is null");
-        return nullptr;
-    }
-
-    napi_value thisArg;
-    if (napi_ok != napi_get_cb_info(env, info, nullptr, nullptr, &thisArg, nullptr)) {
-        LOGE("TestStatisticsInfo::GetCpuInfo: napi_get_cb_info fail");
-        return nullptr;
-    }
-
-    if (getCpuInfo()) {
-        LOGI("getCpuInfo success");
-    }
-    return nullptr;
-}
-
-napi_value TestStatisticsInfo::GetCpuCount(napi_env env, napi_callback_info info)
+napi_value GetSystemInfo::GetCpuCount(napi_env env, napi_callback_info info)
 {
     if ((nullptr == env) || (nullptr == info)) {
         LOGE("TestStatisticsInfo::GetCpuCount: env or info is null");
@@ -96,7 +37,7 @@ napi_value TestStatisticsInfo::GetCpuCount(napi_env env, napi_callback_info info
     return nullptr;
 }
 
-napi_value TestStatisticsInfo::GetMemTotal(napi_env env, napi_callback_info info) {
+napi_value GetSystemInfo::GetMemTotal(napi_env env, napi_callback_info info) {
     if ((nullptr == env) || (nullptr == info)) {
         LOGE("TestStatisticsInfo::GetMemTotal: env or info is null");
         return nullptr;
@@ -117,7 +58,7 @@ napi_value TestStatisticsInfo::GetMemTotal(napi_env env, napi_callback_info info
 
 
 
-napi_value TestStatisticsInfo::GetAvailableMem(napi_env env, napi_callback_info info) {
+napi_value GetSystemInfo::GetAvailableMem(napi_env env, napi_callback_info info) {
     if ((nullptr == env) || (nullptr == info)) {
         LOGE("TestStatisticsInfo::GetFreeMem: env or info is null");
         return nullptr;
@@ -136,25 +77,7 @@ napi_value TestStatisticsInfo::GetAvailableMem(napi_env env, napi_callback_info 
     return res;
 }
 
-napi_value TestStatisticsInfo::GetCachedMem(napi_env env, napi_callback_info info) {
-    if ((nullptr == env) || (nullptr == info)) {
-        LOGE("TestStatisticsInfo::GetCachedMem: env or info is null");
-        return nullptr;
-    }
-
-    napi_value thisArg;
-    if (napi_ok != napi_get_cb_info(env, info, nullptr, nullptr, &thisArg, nullptr)) {
-        LOGE("TestStatisticsInfo::GetCachedMem: napi_get_cb_info fail");
-        return nullptr;
-    }
-    std::string cached = getMemInfoMap("Cached");
-    LOGI("getMemInfoMap success! Cached is %{public}s", cached.c_str());
-    napi_value res;
-    napi_create_string_utf8(env, cached.c_str(), strlen(cached.c_str()), &res);
-    return res;
-}
-
-int TestStatisticsInfo::getCpuCount() {
+int GetSystemInfo::getCpuCount() {
     FILE *fp = fopen("/proc/cpuinfo", "r");
     if (NULL == fp) {
         LOGE("TestStatisticsInfo::getCpuInfo failed to open cpuinfo =======");
@@ -181,7 +104,7 @@ int TestStatisticsInfo::getCpuCount() {
     return count;
 }
 
-std::string TestStatisticsInfo::parseLine(std::string line) {
+std::string GetSystemInfo::parseLine(std::string line) {
     if (!line.empty()) {
         std::string res = line.substr(line.find(":") + 1);
         res.erase(0, res.find_first_not_of(" "));
@@ -191,7 +114,7 @@ std::string TestStatisticsInfo::parseLine(std::string line) {
     return line;
 }
 
-std::string TestStatisticsInfo::getMemInfoMap(std::string field) {
+std::string GetSystemInfo::getMemInfoMap(std::string field) {
     
     std::ifstream meminfo("/proc/meminfo");
     if (!meminfo.is_open()) {
@@ -237,7 +160,7 @@ std::string TestStatisticsInfo::getMemInfoMap(std::string field) {
 // softirq: 软中断统计信息
 
 //计算cpu利用率
-std::string TestStatisticsInfo::calculateCpuUtilization(std::string& a,std::string& a_second) {
+std::string GetSystemInfo::calculateCpuUtilization(std::string& a,std::string& a_second) {
     std::istringstream iss_a(a);
     std::istringstream iss_a_second(a_second);
 
@@ -266,7 +189,7 @@ std::string TestStatisticsInfo::calculateCpuUtilization(std::string& a,std::stri
 }
 
 // 计算cpu利用率
-napi_value TestStatisticsInfo::GetCpu_stat_cpu(napi_env env, napi_callback_info info) {
+napi_value GetSystemInfo::GetCpu_stat_cpu(napi_env env, napi_callback_info info) {
     if ((nullptr == env) || (nullptr == info)) {
         LOGE("TestStatisticsInfo::GetCachedMem: env or info is null");
         return nullptr;
@@ -320,7 +243,7 @@ napi_value TestStatisticsInfo::GetCpu_stat_cpu(napi_env env, napi_callback_info 
 
 
 
-std::string TestStatisticsInfo::getCpu_stat(std::string field) {
+std::string GetSystemInfo::getCpu_stat(std::string field) {
     LOGE("TestStatisticsInfo::GetStat");
     
     std::ifstream cpuInfo("/proc/stat");
@@ -361,45 +284,4 @@ std::string TestStatisticsInfo::getCpu_stat(std::string field) {
 }
 
 /***************************************************************************************/
-
-// 获取cpu info
-bool TestStatisticsInfo::getCpuInfo() {
-    LOGE("TestStatisticsInfo::getCpuInfo =======");
-
-    FILE *fp = fopen("/proc/cpuinfo", "r");
-    if (NULL == fp) {
-        LOGE("TestStatisticsInfo::getCpuInfo failed to open cpuinfo =======");
-        return 0;
-    }
-    char cpuInfo[1000] = {0};
-    LOGE("TestStatisticsInfo::getCpuInfo start======= ");
-    while (!feof(fp)) {
-        memset(cpuInfo, 0, sizeof(cpuInfo));
-        fgets(cpuInfo, sizeof(cpuInfo) - 1, fp);
-        printf("%s", cpuInfo);
-        LOGE("TestStatisticsInfo::getCpuInfo %{public}s", cpuInfo);
-    }
-    LOGE("TestStatisticsInfo::getCpuInfo end~=======");
-    fclose(fp);
-    return 1;
-}
-
-// 获取total memory
-bool TestStatisticsInfo::getMemoryInfo() {
-    FILE *fp = fopen("/proc/meminfo", "r");
-    if (NULL == fp) {
-        LOGE("TestStatisticsInfo::getMemoryInfo failed to open meminfo =======");
-        return 0;
-    }
-    LOGE("TestStatisticsInfo::getMemoryInfo start~=======");
-    char memInfo[1000] = {0};
-    while (!feof(fp)) {
-        memset(memInfo, 0, sizeof(memInfo));
-        fgets(memInfo, sizeof(memInfo) - 1, fp);
-        LOGE("TestStatisticsInfo::getMemoryInfo %{public}s", memInfo);
-    }
-    LOGE("TestStatisticsInfo::getMemoryInfo end~=======");
-    fclose(fp);
-    return 1;
-}
 
