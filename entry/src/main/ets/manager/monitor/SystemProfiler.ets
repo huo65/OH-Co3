@@ -1,5 +1,4 @@
 import batteryInfo from '@ohos.batteryInfo';
-import deviceInfo from '@ohos.deviceInfo';
 import statfs from '@ohos.file.statvfs';
 import HashMap from '@ohos.util.HashMap';
 import testStatisticsApi from 'libentry.so';
@@ -11,14 +10,14 @@ import { taskpool } from '@kit.ArkTS';
 export class DeviceInfo{
   // 设备产品名称
   deviceName: string
-  // 电池电量百分比
+  // 电池剩余百分比
   batteryLevel: number
   // 内存占用
   memoryUsage: number
   // CPU 占用率
   cpuUsage: number
+  // 存储剩余百分比
   storageFree: number
-  score:number
 
   constructor() {
     this.deviceName = "";
@@ -26,7 +25,6 @@ export class DeviceInfo{
     this.memoryUsage = 0;
     this.cpuUsage = 0;
     this.storageFree = 0;
-    this.score = 0;
   }
 
 }
@@ -42,6 +40,7 @@ async function getSystemCpuUsageAsync(): Promise<number> {
 class SystemProfiler{
   private deviceInfos:HashMap<string,DeviceInfo> = new HashMap();
   ownInfo:DeviceInfo = new DeviceInfo();
+
   getDeviceInfos():HashMap<string,DeviceInfo>{
     let otherInfo:HashMap<string,DeviceInfo> = this.getOtherInfo();
     let ownInfo:HashMap<string,DeviceInfo> = this.getOwnInfo();
@@ -64,15 +63,14 @@ class SystemProfiler{
   getOwnInfo():HashMap<string,DeviceInfo>{
     this.getDeviceName()
     this.getCpuInfo()
-    this.getmemoryInfo()
+    this.getMemoryInfo()
     this.getStatfsInfo()
     this.getBatteryInfo()
-    this.getScore()
     nodeInfoSyn.sendOwnInfo(this.ownInfo)
     this.deviceInfos.set(this.ownInfo.deviceName,this.ownInfo)
     return this.deviceInfos
   }
-  // 获取设备产品名称
+  // 获取设备产品名称，
   getDeviceName() {
     this.ownInfo.deviceName = MQTTOption.clientId as string
   }
@@ -86,7 +84,7 @@ class SystemProfiler{
       console.error(`CPU info error: ${error.message}`);
     }
   }
-  getmemoryInfo(){
+  getMemoryInfo(){
     this.ownInfo.memoryUsage =(1 - (Number(testStatisticsApi.getAvailableMem().split(" ")[0]) / Number(testStatisticsApi.getMemTotal().split(" ")[0]))) * 100
   }
 
@@ -97,9 +95,6 @@ class SystemProfiler{
 
   getBatteryInfo() {
     this.ownInfo.batteryLevel = batteryInfo.batterySOC
-  }
-  getScore(){
-    // this.ownInfo.score = scheduler.calculate_score(this.ownInfo.batteryLevel,this.ownInfo.memoryUsage,this.ownInfo.cpuUsage,this.ownInfo.storageFree)
   }
 
 }

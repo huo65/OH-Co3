@@ -30,7 +30,6 @@ class NodeInfoSyn{
     const message: string = `
     {
         "deviceName": "${nodeInfo.deviceName}",
-        "score": "${nodeInfo.score}",
         "params": {
             "deviceName": "${nodeInfo.deviceName}",
             "cpuUsage": ${nodeInfo.cpuUsage},
@@ -72,7 +71,6 @@ class NodeInfoSyn{
           memoryUsage: parseFloat(params.memoryUsage.toFixed(2)),
           storageFree: parseFloat(params.storageFree.toFixed(2)),
           batteryLevel: parseFloat(params.batteryLevel.toFixed(2)),
-          score: newScore
         };
         // Remove existing entry with the same device name if exists
         this.otherNodeInfo = this.otherNodeInfo.filter(node => node.deviceName !== newDeviceName);
