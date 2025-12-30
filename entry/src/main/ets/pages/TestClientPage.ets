@@ -1,7 +1,9 @@
 import { HarmonyInferenceClient, MQTTConfig, InferenceTask, SystemStatus } from '../manager/HarmonyInferenceClient';
 import { DeviceInfo } from '../manager/monitor/SystemProfiler';
-import { InferenceInputType } from '../manager/worker/InferenceWorker';
+import { InferenceInputType, InferenceWorker } from '../manager/worker/InferenceWorker';
 import { SelectTitleBar } from '@kit.ArkUI';
+import { ModelManager } from '../manager/worker/ModelManager';
+
 interface UsageItem {
   icon: Resource
   name: string
@@ -14,6 +16,7 @@ interface UsageItem {
 export struct TestClientPage {
   private client = HarmonyInferenceClient.getInstance();
   private isInitialized: boolean = false;
+  private ImageModelWorker:InferenceWorker = ModelManager.getInstance()
   @State connectionStatus: string = 'Disconnected';
   private testResult: string = '';
   @State
@@ -51,12 +54,12 @@ export struct TestClientPage {
       
       // 连接状态
       Text(`Connection Status: ${this.connectionStatus}`).fontSize(18)
-      
+
       // 初始化按钮
       Button('Initialize Client')
         .onClick(async () => {
           this.log('Initializing client...');
-          const result = await this.client.init(this.mqttConfig, 'mobilenetv2.ms');
+          const result = await this.client.init(this.mqttConfig, 'mobilenetv2.ms', this.ImageModelWorker);
           this.isInitialized = result;
           this.connectionStatus = result ? 'Connected' : 'Failed';
           this.log(`Initialization ${result ? 'success' : 'failed'}`);
