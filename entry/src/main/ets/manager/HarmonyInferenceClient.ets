@@ -1,7 +1,7 @@
 import { MQTTClient, MQTTOptionsType } from './broker/MQTTClient';
 import { MqttQos } from '@ohos/mqtt';
 import { Scheduler } from './scheduler/Scheduler';
-import { ModelManager } from './worker/ModelManager';
+import { ModelManager } from './worker/ImageIdModelManager';
 import { InferenceWorker, InferenceTask, InferenceResult } from './worker/InferenceWorker';
 import { GlobalTaskManager } from './worker/GlobalTaskManager';
 import { DeviceInfo, systemProfiler } from './monitor/SystemProfiler';
@@ -55,7 +55,7 @@ class HarmonyInferenceClient {
   private mqttClient: MQTTClient | null = null;
   private scheduler: Scheduler;
   private worker: InferenceWorker;
-  // TODO 封装时考虑删除
+  // 默认图像识别模型
   private defaultWorker: ModelManager;
   private isInitialized: boolean = false;
   private modelName: string = '';
@@ -79,7 +79,7 @@ class HarmonyInferenceClient {
     }
     return HarmonyInferenceClient.instance;
   }
-  // TODO 进一步完善
+  // TODO 监听任务处理封装
   // 初始化事件监听器
   private initEventListeners(): void {
     // 监听任务结果事件

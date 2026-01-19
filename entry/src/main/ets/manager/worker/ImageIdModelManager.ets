@@ -28,18 +28,18 @@ interface PredictResult {
     val: number;
     idx: number;
   }
-class ModelManager implements InferenceWorker {
-  private static instance: ModelManager
+class ImageIdModelManager implements InferenceWorker {
+  private static instance: ImageIdModelManager
   private modelBuffer: ArrayBuffer = new ArrayBuffer(0);
   private modelInputHeight: number = 224;
   private modelInputWidth: number = 224;
   private isInit: boolean = false;
   // 静态方法获取唯一实例
-  public static getInstance(): ModelManager {
-    if (!ModelManager.instance) {
-      ModelManager.instance = new ModelManager()
+  public static getInstance(): ImageIdModelManager {
+    if (!ImageIdModelManager.instance) {
+      ImageIdModelManager.instance = new ImageIdModelManager()
     }
-    return ModelManager.instance
+    return ImageIdModelManager.instance
   }
 
   async initModel(modelName: string): Promise<void> {
@@ -251,4 +251,4 @@ class ModelManager implements InferenceWorker {
     return imageSource.createPixelMap(opts);
   }
 }
-export {ModelManager}
+export {ImageIdModelManager as ModelManager}

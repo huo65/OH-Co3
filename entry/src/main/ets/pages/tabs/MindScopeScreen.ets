@@ -8,7 +8,7 @@ import emitter from '@ohos.events.emitter';
 import { nodeInfoSyn } from '../../manager/broker/monitor/NodeInfoSyn';
 import { RESULT } from '../../manager/broker/MQTTClient';
 import { DataPass, RealDataPass } from './BrokerScreen';
-import { ModelManager } from '../../manager/worker/ModelManager';
+import { ModelManager } from '../../manager/worker/ImageIdModelManager';
 
 interface PredictResult {
   maxArray: number[];
@@ -138,7 +138,7 @@ export struct MindSpore {
     });
   }
 
-  // private modelManager: ModelManager = new ModelManager();
+  // private modelManager: ImageIdModelManager = new ImageIdModelManager();
 
   @State isLoading: boolean = false;
 

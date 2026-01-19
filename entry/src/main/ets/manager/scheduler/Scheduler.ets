@@ -4,7 +4,7 @@ import { taskDispatch, TaskInfo } from '../broker/task/TaskDispatch';
 import { DeviceInfo, systemProfiler } from '../monitor/SystemProfiler';
 import systemDateTime from '@ohos.systemDateTime';
 import { paramSyn } from '../broker/paramOpt/ParamSyn';
-import { ModelManager } from '../../manager/worker/ModelManager';
+import { ModelManager } from '../worker/ImageIdModelManager';
 import { InferenceTask, InferenceInputType } from '../worker/InferenceWorker';
 const ModelManagerInstance: ModelManager = ModelManager.getInstance()
 class Scheduler{
@@ -33,7 +33,7 @@ class Scheduler{
       console.log(`Highest score node id: ${highestScoreNode[0]}, Score: ${this.calculate_score(highestScoreNode[1])}`);
       if (highestScoreNode[0] != ownName) {
         logMessages.push('[4/6] 任务发送到其他节点')
-        // TODO 配套处理任务发送与接收
+        // TODO 配套处理通用的任务发送与接收：使用统一的任务数据的模型InferenceTask；综合考虑所有数据类型
         let uri = '';
         // if (task.type === InferenceInputType.IMAGE && typeof task.data === 'object' && 'uri' in task.data) {
         //   uri = task.data.uri;
@@ -49,6 +49,7 @@ class Scheduler{
   }
   calculate_score(nodeInfo:DeviceInfo){
     let param = paramSyn.getNewParam()
+    // TODO 更新计算公式，加入网络因素;在系统监控模块加入计算逻辑
     let score = param[0] * (100 - nodeInfo.cpuUsage) + param[1] *(100 - nodeInfo.memoryUsage)  + param[3] * nodeInfo.storageFree + param[2] *nodeInfo.batteryLevel;
     return score;
   }

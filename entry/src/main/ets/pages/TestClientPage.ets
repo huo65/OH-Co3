@@ -2,7 +2,7 @@ import { HarmonyInferenceClient, MQTTConfig, InferenceTask, SystemStatus } from 
 import { DeviceInfo } from '../manager/monitor/SystemProfiler';
 import { InferenceInputType, InferenceWorker } from '../manager/worker/InferenceWorker';
 import { SelectTitleBar } from '@kit.ArkUI';
-import { ModelManager } from '../manager/worker/ModelManager';
+import { ModelManager } from '../manager/worker/ImageIdModelManager';
 
 interface UsageItem {
   icon: Resource
