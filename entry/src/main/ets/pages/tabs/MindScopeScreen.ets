@@ -3,7 +3,7 @@ import photoAccessHelper from '@ohos.file.photoAccessHelper';
 
 import { Scheduler} from '../../manager/scheduler/Scheduler';
 import systemDateTime from '@ohos.systemDateTime';
-import { taskDispatch, TaskInfo } from '../../manager/broker/task/TaskDispatch';
+import { taskDispatch } from '../../manager/broker/task/TaskDispatch';
 import emitter from '@ohos.events.emitter';
 import { nodeInfoSyn } from '../../manager/broker/monitor/NodeInfoSyn';
 import { RESULT } from '../../manager/broker/MQTTClient';

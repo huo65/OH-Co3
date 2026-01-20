@@ -1,17 +1,17 @@
 import HashMap from '@ohos.util.HashMap';
 import { ownName } from '../broker/monitor/NodeInfoSyn';
-import { taskDispatch, TaskInfo } from '../broker/task/TaskDispatch';
+import { taskDispatch, TaskTransmitData } from '../broker/task/TaskDispatch';
 import { DeviceInfo, systemProfiler } from '../monitor/SystemProfiler';
-import systemDateTime from '@ohos.systemDateTime';
 import { paramSyn } from '../broker/paramOpt/ParamSyn';
 import { ModelManager } from '../worker/ImageIdModelManager';
 import { InferenceTask, InferenceInputType } from '../worker/InferenceWorker';
-const ModelManagerInstance: ModelManager = ModelManager.getInstance()
+import { systemDateTime } from '@kit.BasicServicesKit';
+
 class Scheduler{
   private static SchedulerInstance: Scheduler
 
   private deviceInfos:HashMap<string,DeviceInfo> = new HashMap();
-
+  // 与原项目解耦合
   workScheduler(task: InferenceTask, logMessages: Array<string>):Boolean{
     logMessages.push('[3/6] 调度处理')
     this.deviceInfos =  systemProfiler.getDeviceInfos();
@@ -33,12 +33,7 @@ class Scheduler{
       console.log(`Highest score node id: ${highestScoreNode[0]}, Score: ${this.calculate_score(highestScoreNode[1])}`);
       if (highestScoreNode[0] != ownName) {
         logMessages.push('[4/6] 任务发送到其他节点')
-        // TODO 配套处理通用的任务发送与接收：使用统一的任务数据的模型InferenceTask；综合考虑所有数据类型
-        let uri = '';
-        // if (task.type === InferenceInputType.IMAGE && typeof task.data === 'object' && 'uri' in task.data) {
-        //   uri = task.data.uri;
-        // }
-        this.dispatchTask(uri, highestScoreNode[0])
+        this.dispatchTask(task, highestScoreNode[0])
         logMessages.push('[5/6] 任务发送成功')
         return false
       }
@@ -62,39 +57,35 @@ class Scheduler{
 
 
 
-  async dispatchTask(url: string, to: string) {
-    let taskInfo: TaskInfo = new TaskInfo();
+  /**
+   * 发送任务
+   * @param url
+   * @param to
+   */
+  async dispatchTask(inferenceTask: InferenceTask, to: string) {
+    let taskInfo: TaskTransmitData = new TaskTransmitData();
 
     try {
-      // 使用封装的 Promise 方法获取当前时间
       const time = await this.getCurrentTimeAsync();
+      // TODO 测试后删除
       console.info(`Succeeded in getting currentTime : ${time}`);
       taskInfo.taskId = time.toString();
-
-      // 初始化其他字段
       taskInfo.fromClient = ownName;
       taskInfo.toClient = to;
-      taskInfo.interTime = "now";
-      taskInfo.params.bitmap = await ModelManagerInstance.processImageTOBase64(url);
-
-      // 所有数据准备完毕后再发送任务
+      taskInfo.interTime = await this.getCurrentTimeAsync();
+      // TODO 针对特殊任务类型，Worker中添加发送数据处理？（还是传输的问题）
+      // taskInfo.params.bitmap = await ModelManagerInstance.processImageTOBase64(url);
+      taskInfo.params = inferenceTask;
       taskDispatch.sendTask(taskInfo);
     } catch (error) {
-      console.error("Failed to get current time:", error);
-      // 可选：处理错误或提示用户
+      console.error("Failed to send task:", error);
     }
   }
 
-  // 将原来的回调方式封装为 Promise
+  // 使用封装的 Promise 方法获取当前时间
   private getCurrentTimeAsync(): Promise<number> {
     return new Promise((resolve, reject) => {
-      systemDateTime.getCurrentTime(false, (error, time) => {
-        if (error) {
-          reject(error);
-        } else {
-          resolve(time);
-        }
-      });
+      systemDateTime.getTime(true)
     });
   }
 }

@@ -4,7 +4,8 @@ import modelPredict from './Model';
 import util from '@ohos.util';
 import buffer from '@ohos.buffer';
 import { fileIo } from '@kit.CoreFileKit';
-import { InferenceWorker, InferenceInput, InferenceResult, InferenceInputType, ImageInputData,
+import { InferenceWorker,
+  InferenceResult, InferenceInputType, ImageInputData,
   InferenceTask } from './InferenceWorker';
 
 

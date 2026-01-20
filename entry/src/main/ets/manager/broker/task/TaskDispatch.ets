@@ -1,4 +1,6 @@
+import { InferenceTask } from '../../HarmonyInferenceClient';
 import { GlobalTaskManager } from '../../worker/GlobalTaskManager';
+import { InferenceInputType } from '../../worker/InferenceWorker';
 import { SerialTaskQueue } from '../../worker/SerialTaskQueue';
 import { ownName } from '../monitor/NodeInfoSyn';
 import { MQTTClient } from '../MQTTClient'
@@ -16,42 +18,56 @@ interface TaskResultObj{
 interface ResultInfo{
   result:string
 }
-// TODO 需要改造
-class TaskInfo {
+
+class TaskTransmitData {
   taskId: string;
   fromClient: string;
   toClient: string;
-  interTime: string;
-  params: TaskParams;
+  interTime: number;//记录接收时间，之后计算总耗时
+  params: InferenceTask;
   constructor() {
     this.taskId = "";
     this.fromClient = "";
     this.toClient = "";
-    this.interTime = "";
-    this.params = {bitmap:""};
+    this.interTime = 0;
+    this.params = {taskId:"" , modelName:"", type: InferenceInputType.IMAGE, data : {uri:""}};
   }
 }
 class TaskDispatch{
-  // ownName:String = "OpenHarmony 3.2";
-  async sendTask(taskInfo: TaskInfo): Promise<boolean> {
+
+  /**
+   * 发送被调度的任务
+   * @param taskInfo
+   * @returns
+   */
+  async sendTask(taskInfo: TaskTransmitData): Promise<boolean> {
     const MQTTInstance: MQTTClient = MQTTClient.getInstance()
-    const bitmapParams:TaskParams =  taskInfo.params
   try {
-    const message = JSON.stringify({
-      taskId: taskInfo.taskId,
-      fromClient: taskInfo.fromClient,
-      toClient: taskInfo.toClient,
-      timestamp: taskInfo.interTime,
-      params:bitmapParams
+    const taskInfoMessage = JSON.stringify({
+      taskInfo
     });
-    MQTTInstance.pushMessage(message,"task/assign");
+    MQTTInstance.pushMessage(taskInfoMessage,"task/assign");
     return true;
   } catch (e) {
     console.error(e);
     return false;
   }
 }
-  // TODO 发送接收任务的结果
+  /**
+   * 解析收到的任务
+   * @param message
+   */
+  parseTaskMessage(message:string){
+    const taskInfo:TaskTransmitData = JSON.parse(message)
+    // TODO 注意会有重复处理
+    if (taskInfo.toClient == ownName) {
+      //   做一个任务队列，避免阻塞，同时可以扩展任务流转
+      //   GlobalTaskManager.getQueue().addTask(taskInfo);
+
+    }
+
+  }
+  // TODO 发送任务执行的结果
   sendTaskResult(){
 
   }
@@ -77,20 +93,11 @@ class TaskDispatch{
     }
     return ""
   }
-  parseTaskMessage(message:string){
-    const taskInfo:TaskInfo = JSON.parse(message)
-    // TODO 注意会有重复处理
-    if (taskInfo.toClient == ownName) {
-    //   做一个任务队列，避免阻塞，同时可以扩展任务流转
-    //   GlobalTaskManager.getQueue().addTask(taskInfo);
 
-    }
-
-  }
 
 
 
 
 }
 export const taskDispatch = new TaskDispatch();
-export {TaskInfo}
+export {TaskTransmitData}

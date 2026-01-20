@@ -14,6 +14,7 @@ export enum InferenceInputType {
 export interface InferenceParams extends Record<string, string | number | boolean | ArrayBuffer> {}
 
 // 图像输入数据类型
+// TODO 图片传输方式优化，MQTT带宽太低
 export interface ImageInputData {
   uri: string; // 本地图像URI
 }
@@ -28,13 +29,6 @@ export interface AudioInputData {
   buffer: ArrayBuffer; // 音频数据缓冲区
   sampleRate: number; // 采样率
   channels: number; // 声道数
-}
-
-// 通用推理输入类型
-export interface InferenceInput {
-  type: InferenceInputType;
-  data: ImageInputData | TextInputData | AudioInputData | ArrayBuffer;
-  params?: InferenceParams;
 }
 
 // 推理结果类型
@@ -55,7 +49,7 @@ export interface InferenceResult {
   customData?: ArrayBuffer;
 }
 
-// 推理任务参数类型（用于导入）
+// 推理任务参数
 export interface InferenceTask {
   // 任务相关字段
   taskId?: string;
