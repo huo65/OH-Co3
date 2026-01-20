@@ -8,7 +8,7 @@ import emitter from '@ohos.events.emitter';
 import { nodeInfoSyn } from '../../manager/broker/monitor/NodeInfoSyn';
 import { RESULT } from '../../manager/broker/MQTTClient';
 import { DataPass, RealDataPass } from './BrokerScreen';
-import { ModelManager } from '../../manager/worker/ImageIdModelManager';
+import { ModelManager } from '../../TestImageTask/ImageIdModelManager';
 
 interface PredictResult {
   maxArray: number[];

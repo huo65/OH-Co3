@@ -1,12 +1,11 @@
 import image from '@ohos.multimedia.image';
-// import fileIo from '@ohos.file.fs';
 import modelPredict from './Model';
 import util from '@ohos.util';
 import buffer from '@ohos.buffer';
 import { fileIo } from '@kit.CoreFileKit';
 import { InferenceWorker,
   InferenceResult, InferenceInputType, ImageInputData,
-  InferenceTask } from './InferenceWorker';
+  InferenceTask } from '../manager/worker/InferenceWorker';
 
 
 // 在文件顶部添加类型定义

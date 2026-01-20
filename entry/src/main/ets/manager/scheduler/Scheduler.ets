@@ -3,7 +3,7 @@ import { ownName } from '../broker/monitor/NodeInfoSyn';
 import { taskDispatch, TaskTransmitData } from '../broker/task/TaskDispatch';
 import { DeviceInfo, systemProfiler } from '../monitor/SystemProfiler';
 import { paramSyn } from '../broker/paramOpt/ParamSyn';
-import { ModelManager } from '../worker/ImageIdModelManager';
+import { ModelManager } from '../../TestImageTask/ImageIdModelManager';
 import { InferenceTask, InferenceInputType } from '../worker/InferenceWorker';
 import { systemDateTime } from '@kit.BasicServicesKit';
 

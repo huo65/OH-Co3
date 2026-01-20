@@ -1,7 +1,7 @@
 import { MQTTClient, MQTTOptionsType } from './broker/MQTTClient';
 import { MqttQos } from '@ohos/mqtt';
 import { Scheduler } from './scheduler/Scheduler';
-import { ModelManager } from './worker/ImageIdModelManager';
+import { ModelManager } from '../TestImageTask/ImageIdModelManager';
 import { InferenceWorker, InferenceTask, InferenceResult } from './worker/InferenceWorker';
 import { GlobalTaskManager } from './worker/GlobalTaskManager';
 import { DeviceInfo, systemProfiler } from './monitor/SystemProfiler';
