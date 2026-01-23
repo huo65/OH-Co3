@@ -117,6 +117,7 @@ class MQTTClient {
     }).catch((err: Error) => {
       console.error('MQTT订阅主题失败：', JSON.stringify(err))
     })
+    await this.subscribeTopic(["/device/list","/device/status","/task/assign","/task/result","/optimization/param","/test/latency"])
     // 监听订阅主题
     this.messageArrived()
   }

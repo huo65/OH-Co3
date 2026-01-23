@@ -3,18 +3,25 @@ import { MQTTClient } from '../MQTTClient'
 import {MQTTOption} from '../MQTTConfig'
 import HashMap from '@ohos.util.HashMap'
 import deviceInfo from '@ohos.deviceInfo';
+import { systemDateTime } from '@kit.BasicServicesKit';
 
 interface NodeInfoObj {
   deviceName: string;
   score: number;
   params: DeviceInfo
 }
+interface LatencyInfoObj {
+  deviceName: string;
+  timeStamp: number;
+}
+
 
 const ownName: string = MQTTOption.clientId as string
 
 class NodeInfoSyn{
 
   otherNodeInfo:DeviceInfo[] = [];
+  lastLatency:number = 1;
 
 
   getOtherNodeInfo():HashMap<string,DeviceInfo> {
@@ -35,7 +42,8 @@ class NodeInfoSyn{
             "cpuUsage": ${nodeInfo.cpuUsage},
             "memoryUsage": ${nodeInfo.memoryUsage},
             "storageFree": ${nodeInfo.storageFree},
-            "batteryLevel": ${nodeInfo.batteryLevel}
+            "batteryLevel": ${nodeInfo.batteryLevel},
+            "latency": ${nodeInfo.latency}
         }
     }
     `.trim();
@@ -61,9 +69,8 @@ class NodeInfoSyn{
     try {
       const nodeInfoObj:NodeInfoObj = JSON.parse(message);
       const newDeviceName:string = nodeInfoObj.deviceName;
-      const newScore:number = nodeInfoObj.score;
 
-      if (ownName !== newDeviceName) {
+      if (ownName == newDeviceName) {
         const params:DeviceInfo = nodeInfoObj.params;
         const newNodeInfo: DeviceInfo = {
           deviceName: newDeviceName,
@@ -86,6 +93,42 @@ class NodeInfoSyn{
       console.error("Error parsing message:", e);
     }
 
+
+  }
+
+  testLatencySend(){
+    const MQTTInstance: MQTTClient = MQTTClient.getInstance()
+    const timepStamp = systemDateTime.getTime(false);
+    const message: string = `
+    {
+        "deviceName": "${ownName}",
+        "timeStamp": "${timepStamp}"
+    }
+    `.trim();
+
+    MQTTInstance.pushMessage(message,"/test/latency");
+  }
+  testLatencyRec(message:string){
+    try {
+      const latencyInfoObj:LatencyInfoObj = JSON.parse(message);
+      const objDeviceName:string = latencyInfoObj.deviceName;
+
+      if (ownName == objDeviceName) {
+        const timeStamp:number = latencyInfoObj.timeStamp;
+        const newTimepStamp = systemDateTime.getTime(false);
+        console.error(`getLatencyLast: ${timeStamp}`);
+        console.error(`getLatencyNew: ${newTimepStamp}`);
+        let latency = newTimepStamp - timeStamp;
+        this.lastLatency = latency;
+      } else {
+        // TODO 后期清理无用日志
+        console.log("huoNO");
+      }
+    } catch (e) {
+      console.error("Error parsing message:", e);
+    }
+    ;
+    return 0;
 
   }
 

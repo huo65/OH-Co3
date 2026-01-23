@@ -74,6 +74,7 @@ class SystemProfiler{
     this.getMemoryInfo()
     this.getStatfsInfo()
     this.getBatteryInfo()
+    this.updateLatency()
     nodeInfoSyn.sendOwnInfo(this.ownInfo)
     this.deviceInfos.set(this.ownInfo.deviceName,this.ownInfo)
     return this.deviceInfos
@@ -109,6 +110,9 @@ class SystemProfiler{
 
   getBatteryInfo() {
     this.ownInfo.batteryLevel = batteryInfo.batterySOC
+  }
+  updateLatency(){
+    this.ownInfo.latency = (nodeInfoSyn.lastLatency)/300;
   }
 
 }

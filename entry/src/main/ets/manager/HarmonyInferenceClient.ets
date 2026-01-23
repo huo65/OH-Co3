@@ -66,7 +66,6 @@ class HarmonyInferenceClient {
     this.scheduler = Scheduler.getInstance();
     this.defaultWorker = ModelManager.getInstance();
     this.worker = this.defaultWorker;
-    // this.initEventListeners();
   }
 
   // 获取单例实例
@@ -86,23 +85,24 @@ class HarmonyInferenceClient {
         clientId: config.clientId,
         userName: config.userName,
         password: config.password,
-        topic: config.topic || 'task/request',
+        topic: config.topic,
         qos: config.qos || 1
       };
 
       this.mqttClient = MQTTClient.getNewInstance(mqttOptions);
-      await this.mqttClient.init();
+      // await this.mqttClient.init();
       // 监控连接状态
       setInterval(async () => {
         if (this.mqttClient) {
           const isConnected = await this.mqttClient.isCon();
           if (isConnected) {
             this.connectionStatus = 'Connected';
+            nodeInfoSyn.testLatencySend()
           } else {
             this.connectionStatus = 'Disconnected';
           }
         }
-      }, 5000);
+      }, 10000);
     }catch (error) {
       console.error("Failed to check connection status:", error);
       this.connectionStatus = 'Error';
@@ -113,7 +113,7 @@ class HarmonyInferenceClient {
   // 初始化事件监听器
   private initEventListeners(): void {
     if (this.mqttClient) {
-      this.mqttClient.subscribeTopic(["/device/list","/device/status","/task/assign","/task/result","/optimization/param"])
+      // 转移到初始化逻辑this.mqttClient.subscribeTopic(["/device/list","/device/status","/task/assign","/task/result","/optimization/param","/test/latency"])
       emitter.on({
         eventId: EVENTID
       }, (data) => {
@@ -123,6 +123,9 @@ class HarmonyInferenceClient {
         let realMessage:RealDataPass = JSON.parse(realData)
         if (realMessage.topic == "/device/status") {
           nodeInfoSyn.parseNodeInfoMessage(realMessage.content);
+        }
+        if (realMessage.topic == "/test/latency") {
+          nodeInfoSyn.testLatencyRec(realMessage.content);
         }
         if (realMessage.topic == "/optimization/param") {
           paramSyn.parseParamMessage(realMessage.content);
