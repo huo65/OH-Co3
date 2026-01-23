@@ -6,10 +6,8 @@
 EXTERN_C_START
 static napi_value Init(napi_env env, napi_value exports) {
     napi_property_descriptor desc[] = {
-        { "getCpuCount", nullptr, GetSystemInfo::GetCpuCount, nullptr, nullptr, nullptr, napi_default, nullptr },
-        { "getMemTotal", nullptr, GetSystemInfo::GetMemTotal, nullptr, nullptr, nullptr, napi_default, nullptr },
-        { "getAvailableMem", nullptr, GetSystemInfo::GetAvailableMem, nullptr, nullptr, nullptr, napi_default, nullptr },
-        { "getCpuUsage", nullptr, GetSystemInfo::GetCpu_stat_cpu, nullptr, nullptr, nullptr, napi_default, nullptr }
+        { "getCpuUsage", nullptr, GetSystemInfo::GetCpuUsage, nullptr, nullptr, nullptr, napi_default, nullptr },
+        { "getMemUsage", nullptr, GetSystemInfo::GetMemUsage, nullptr, nullptr, nullptr, napi_default, nullptr }
     };
     napi_define_properties(env, exports, sizeof(desc) / sizeof(desc[0]), desc);
     return exports;

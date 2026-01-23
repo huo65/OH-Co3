@@ -12,9 +12,9 @@ export class DeviceInfo{
   deviceName: string
   // 电池剩余百分比
   batteryLevel: number
-  // 内存占用
+  // 内存占用率
   memoryUsage: number
-  // CPU 占用率
+  // CPU占用率
   cpuUsage: number
   // 存储剩余百分比
   storageFree: number
@@ -78,19 +78,25 @@ class SystemProfiler{
     try {
       const task = new taskpool.Task(getSystemCpuUsageAsync);
       const cpuUsage = await taskpool.execute(task);
-      console.info(`getSystemCpuUsage: ${cpuUsage}`);
-      this.ownInfo.cpuUsage = cpuUsage as number;
+      const rawValue = cpuUsage as number;
+      this.ownInfo.cpuUsage = Math.round(rawValue * 10000) / 10000;
     } catch (error) {
       console.error(`CPU info error: ${error.message}`);
     }
   }
   getMemoryInfo(){
-    this.ownInfo.memoryUsage =(1 - (Number(GetSystemInfo.getAvailableMem().split(" ")[0]) / Number(GetSystemInfo.getMemTotal().split(" ")[0]))) * 100
+    const rawValue = GetSystemInfo.getMemUsage();
+    this.ownInfo.memoryUsage = Math.round(rawValue * 10000) / 10000;
   }
 
   getStatfsInfo() {
     const context = getContext()
-    this.ownInfo.storageFree = statfs.getFreeSizeSync(context.filesDir) / (1000 * 1000 * 1000)
+    try {
+      const rawValue = statfs.getFreeSizeSync(context.filesDir) / statfs.getTotalSizeSync(context.filesDir);
+      this.ownInfo.storageFree = Math.round(rawValue * 10000) / 10000;
+    } catch (error) {
+      console.error(`storage info error: ${error.message}`);
+    }
   }
 
   getBatteryInfo() {
