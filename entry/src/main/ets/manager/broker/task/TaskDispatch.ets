@@ -30,7 +30,7 @@ class TaskTransmitData {
     this.fromClient = "";
     this.toClient = "";
     this.interTime = 0;
-    this.params = {taskId:"" , modelName:"", type: InferenceInputType.IMAGE, data : {uri:""}};
+    this.params = {taskId:"" , modelName:"", type: InferenceInputType.IMAGE, data : { imageData :""}as ImageInputData};
   }
 }
 class TaskDispatch{
