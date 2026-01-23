@@ -18,6 +18,8 @@ export class DeviceInfo{
   cpuUsage: number
   // 存储剩余百分比
   storageFree: number
+  // 网络延迟，联网前默认为1
+  latency: number
 
   constructor() {
     this.deviceName = "";
@@ -25,6 +27,7 @@ export class DeviceInfo{
     this.memoryUsage = 0;
     this.cpuUsage = 0;
     this.storageFree = 0;
+    this.latency = 1;
   }
 
 }
@@ -46,12 +49,17 @@ class SystemProfiler{
     let ownInfo:HashMap<string,DeviceInfo> = this.getOwnInfo();
     let  combinedInfo:HashMap<string,DeviceInfo> = new HashMap<string, DeviceInfo>();
 
-    otherInfo.forEach((value, key) => {
-      combinedInfo.set(key, value);
-    });
-    ownInfo.forEach((value, key) => {
-      combinedInfo.set(key, value);
-    });
+    try {
+      otherInfo.forEach((value, key) => {
+        combinedInfo.set(key, value);
+      });
+      ownInfo.forEach((value, key) => {
+        combinedInfo.set(key, value);
+      });
+    } catch (error) {
+      console.error(`getDeviceInfos error: ${error.message}`);
+    }
+
 
     return combinedInfo;
   }

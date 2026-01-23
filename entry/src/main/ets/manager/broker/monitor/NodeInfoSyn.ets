@@ -71,6 +71,7 @@ class NodeInfoSyn{
           memoryUsage: parseFloat(params.memoryUsage.toFixed(2)),
           storageFree: parseFloat(params.storageFree.toFixed(2)),
           batteryLevel: parseFloat(params.batteryLevel.toFixed(2)),
+          latency: parseFloat(params.latency.toFixed(2))
         };
         // Remove existing entry with the same device name if exists
         this.otherNodeInfo = this.otherNodeInfo.filter(node => node.deviceName !== newDeviceName);
