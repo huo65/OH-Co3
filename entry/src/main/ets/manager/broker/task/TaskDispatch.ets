@@ -1,10 +1,7 @@
 import { InferenceTask } from '../../HarmonyInferenceClient';
-import { GlobalTaskManager } from '../../worker/GlobalTaskManager';
-import { InferenceInputType } from '../../worker/InferenceWorker';
-import { SerialTaskQueue } from '../../worker/SerialTaskQueue';
+import { ImageInputData, InferenceInputType } from '../../worker/InferenceWorker';
 import { ownName } from '../monitor/NodeInfoSyn';
 import { MQTTClient } from '../MQTTClient'
-import {MQTTOption} from '../MQTTConfig'
 
 interface TaskParams {
   bitmap: string;
@@ -30,7 +27,7 @@ class TaskTransmitData {
     this.fromClient = "";
     this.toClient = "";
     this.interTime = 0;
-    this.params = {taskId:"" , modelName:"", type: InferenceInputType.IMAGE, data : { imageData :""}as ImageInputData};
+    this.params = {taskId:"" , modelName:"", type: InferenceInputType.IMAGE, data : { imageData :""} };
   }
 }
 class TaskDispatch{

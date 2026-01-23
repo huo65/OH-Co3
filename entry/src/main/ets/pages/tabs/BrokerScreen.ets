@@ -26,7 +26,7 @@ export struct  MqttClientScreen {
   @State title: string = 'MQTT客户端';
   @State sendMsg: string = ''
   @State receiveMsg: Array<string> = [];
-  // TODO 任务监听参考
+
   aboutToAppear(): void {
     setInterval(() => {
       this.checkConnectionStatus()
