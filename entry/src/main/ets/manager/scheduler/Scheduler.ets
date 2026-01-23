@@ -43,8 +43,7 @@ class Scheduler{
   }
   calculate_score(nodeInfo:DeviceInfo){
     let param = paramSyn.getNewParam()
-    // TODO 更新计算公式，加入网络因素;在系统监控模块加入计算逻辑
-    let score = param[0] * (100 - nodeInfo.cpuUsage) + param[1] *(100 - nodeInfo.memoryUsage)  + param[3] * nodeInfo.storageFree + param[2] *nodeInfo.batteryLevel;
+    let score = param[0] * (1 - nodeInfo.cpuUsage) + param[1] *(1 - nodeInfo.memoryUsage)  + param[2] * nodeInfo.batteryLevel + param[3] *nodeInfo.storageFree + param[4]*(1 - nodeInfo.latency);
     return score;
   }
   public static getInstance(): Scheduler {

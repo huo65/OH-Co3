@@ -3,6 +3,7 @@ import { DeviceInfo } from '../manager/monitor/SystemProfiler';
 import { InferenceInputType, InferenceWorker } from '../manager/worker/InferenceWorker';
 import { SelectTitleBar } from '@kit.ArkUI';
 import { ModelManager } from '../TestImageTask/ImageIdModelManager';
+import deviceInfo from '@ohos.deviceInfo';
 
 interface UsageItem {
   icon: Resource
@@ -25,11 +26,11 @@ export struct TestClientPage {
 
   // MQTT配置
   private mqttConfig: MQTTConfig = {
-    url: 'tcp://localhost:1883',
-    clientId: 'test-client',
-    userName: '',
-    password: '',
-    topic: 'task/request',
+    url: 'mqtt://10.51.155.159:1883',
+    clientId: deviceInfo.marketName + "_" + Math.floor(Math.random() * 10000),
+    userName: 'root',
+    password: 'admin',
+    topic: '/test/123',
     qos: 1
   };
 

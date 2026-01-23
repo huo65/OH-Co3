@@ -18,7 +18,7 @@ export class DeviceInfo{
   cpuUsage: number
   // 存储剩余百分比
   storageFree: number
-  // 网络延迟，联网前默认为1
+  // 网络延迟，联网前默认为1 TODO 网络延迟计算
   latency: number
 
   constructor() {

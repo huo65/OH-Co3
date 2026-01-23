@@ -1,4 +1,4 @@
-import { MQTTClient, MQTTOptionsType } from './broker/MQTTClient';
+import { EVENTID, MQTTClient, MQTTOptionsType } from './broker/MQTTClient';
 import { MqttQos } from '@ohos/mqtt';
 import { Scheduler } from './scheduler/Scheduler';
 import { ModelManager } from '../TestImageTask/ImageIdModelManager';
@@ -7,9 +7,19 @@ import { GlobalTaskManager } from './worker/GlobalTaskManager';
 import { DeviceInfo, systemProfiler } from './monitor/SystemProfiler';
 import HashMap from '@ohos.util.HashMap';
 import emitter from '@ohos.events.emitter';
+import { nodeInfoSyn } from './broker/monitor/NodeInfoSyn';
+import { paramSyn } from './broker/paramOpt/ParamSyn';
+import { taskDispatch } from './broker/task/TaskDispatch';
 
 // 事件ID定义
 const RESULT_EVENT_ID = 1002;
+export interface DataPass {
+  data:string;
+}
+export  interface RealDataPass {
+  topic: string,
+  content: string;
+}
 
 // MQTT连接配置类型
 export interface MQTTConfig {
@@ -36,32 +46,19 @@ export interface TaskStatus {
   error?: string;
 }
 
-// 设备状态更新回调类型
-export type DeviceStatusCallback = (status: SystemStatus) => void;
 
-// 任务结果回调类型
-export type TaskResultCallback = (result: InferenceResult) => void;
-
-// 任务错误回调类型
-export type TaskErrorCallback = (error: string) => void;
-
-interface GeneratedTypeLiteralInterface_1 {
-  resolve: (result: InferenceResult) => void;
-  reject: (error: Error) => void;
-}
 
 class HarmonyInferenceClient {
   private static instance: HarmonyInferenceClient;
   private mqttClient: MQTTClient | null = null;
   private scheduler: Scheduler;
   private worker: InferenceWorker;
+  private connectionStatus: string = 'Disconnected';
   // 默认图像识别模型
   private defaultWorker: ModelManager;
   private isInitialized: boolean = false;
   private modelName: string = '';
   //存疑
-  private taskCallbacks: Map<string, GeneratedTypeLiteralInterface_1> = new Map();
-  private deviceStatusCallbacks: Set<DeviceStatusCallback> = new Set();
   private taskStatusMap: Map<string, TaskStatus> = new Map();
 
   // 私有构造函数
@@ -79,41 +76,9 @@ class HarmonyInferenceClient {
     }
     return HarmonyInferenceClient.instance;
   }
-  // TODO 监听任务处理封装
-  // 初始化事件监听器
-  private initEventListeners(): void {
-    // 监听任务结果事件
-    emitter.on({
-      eventId: RESULT_EVENT_ID,
-      priority: emitter.EventPriority.LOW
-    }, (eventData) => {
-      this.handleTaskResult(eventData.data?.content);
-    });
-  }
 
 
-
-  // 注册设备状态更新回调
-  public registerDeviceStatusCallback(callback: DeviceStatusCallback): void {
-    this.deviceStatusCallbacks.add(callback);
-    // 立即调用一次回调，提供当前状态
-    callback(this.getSystemStatus());
-  }
-
-  // 注销设备状态更新回调
-  public unregisterDeviceStatusCallback(callback: DeviceStatusCallback): void {
-    this.deviceStatusCallbacks.delete(callback);
-  }
-
-
-
-  // ####----------------------------------@初始化与注销（连接）@----------------------------------####
-  // 初始化方法
-  public async init(config: MQTTConfig, modelName: string, customWorker?: InferenceWorker): Promise<boolean> {
-    if (this.isInitialized) {
-      return true;
-    }
-
+  private async initMQTTClient(config: MQTTConfig): Promise<void>{
     try {
       // 初始化MQTT连接
       const mqttOptions: MQTTOptionsType = {
@@ -127,6 +92,72 @@ class HarmonyInferenceClient {
 
       this.mqttClient = MQTTClient.getNewInstance(mqttOptions);
       await this.mqttClient.init();
+      // 监控连接状态
+      setInterval(async () => {
+        if (this.mqttClient) {
+          const isConnected = await this.mqttClient.isCon();
+          if (isConnected) {
+            this.connectionStatus = 'Connected';
+          } else {
+            this.connectionStatus = 'Disconnected';
+          }
+        }
+      }, 5000);
+    }catch (error) {
+      console.error("Failed to check connection status:", error);
+      this.connectionStatus = 'Error';
+    }
+
+  }
+  // TODO 监听任务处理封装
+  // 初始化事件监听器
+  private initEventListeners(): void {
+    if (this.mqttClient) {
+      this.mqttClient.subscribeTopic(["/device/list","/device/status","/task/assign","/task/result","/optimization/param"])
+      emitter.on({
+        eventId: EVENTID
+      }, (data) => {
+        let message:string = JSON.stringify(data)
+        let dataMessage:DataPass = JSON.parse(message)
+        let realData:string = JSON.stringify(dataMessage.data)
+        let realMessage:RealDataPass = JSON.parse(realData)
+        if (realMessage.topic == "/device/status") {
+          nodeInfoSyn.parseNodeInfoMessage(realMessage.content);
+        }
+        if (realMessage.topic == "/optimization/param") {
+          paramSyn.parseParamMessage(realMessage.content);
+        }
+        // 接收任务，参数
+        if (realMessage.topic == "/task/assign") {
+          taskDispatch.parseTaskMessage(realMessage.content);
+        }
+      });
+      // 监听任务结果事件
+      emitter.on({
+        eventId: RESULT_EVENT_ID,
+        priority: emitter.EventPriority.LOW
+      }, (eventData) => {
+        this.handleTaskResult(eventData.data?.content);
+      });
+    }
+
+  }
+
+
+
+
+
+
+  // ####----------------------------------@初始化与注销（连接）@----------------------------------####
+  // 初始化方法
+  public async init(config: MQTTConfig, modelName: string, customWorker?: InferenceWorker): Promise<boolean> {
+    if (this.isInitialized) {
+      return true;
+    }
+
+    try {
+      await this.initMQTTClient(config)
+      this.initEventListeners()
 
       // 使用自定义Worker或默认Worker
       if (customWorker) {
@@ -170,11 +201,6 @@ class HarmonyInferenceClient {
         await this.worker.release();
       }
 
-      // 清空任务回调和状态
-      this.taskCallbacks.clear();
-      this.taskStatusMap.clear();
-      this.deviceStatusCallbacks.clear();
-
       // 移除事件监听器
       emitter.off(RESULT_EVENT_ID);
 
@@ -194,6 +220,9 @@ class HarmonyInferenceClient {
     }
     return await this.mqttClient.isCon();
   }
+  public getConnectionStatus():string{
+    return this.connectionStatus
+  }
 
   // ####----------------------------------@状态信息获取与同步@----------------------------------####
   // 启动设备状态同步
@@ -205,19 +234,12 @@ class HarmonyInferenceClient {
     // 定期更新设备状态
     setInterval(() => {
       this.updateDeviceStatus();
-    }, 5000); // 每5秒更新一次
+    }, 10000); // 每10秒更新一次
   }
 
   // 更新设备状态并通知回调
   private updateDeviceStatus(): void {
     const status = this.getSystemStatus();
-    this.deviceStatusCallbacks.forEach(callback => {
-      try {
-        callback(status);
-      } catch (error) {
-        console.error('Error in device status callback:', error);
-      }
-    });
   }
   // 获取全局系统状态视图
   public getSystemStatus(): SystemStatus {
@@ -308,28 +330,27 @@ class HarmonyInferenceClient {
           console.info('Task sent to remote device, waiting for result');
           // 生成唯一任务ID
           const taskId = `task-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
-          // 保存任务回调
-          this.taskCallbacks.set(taskId, { resolve, reject });
+
           // 更新任务状态
           this.taskStatusMap.set(taskId, {
             taskId,
             status: 'pending'
           });
 
-          // 设置超时处理
-          setTimeout(() => {
-            if (this.taskCallbacks.has(taskId)) {
-              const error = 'Task timeout';
-              reject(new Error(error));
-              this.taskCallbacks.delete(taskId);
-              // 更新任务状态
-              this.taskStatusMap.set(taskId, {
-                taskId,
-                status: 'failed',
-                error
-              });
-            }
-          }, 30000); // 30秒超时
+          // // 设置超时处理
+          // setTimeout(() => {
+          //   if (this.taskCallbacks.has(taskId)) {
+          //     const error = 'Task timeout';
+          //     reject(new Error(error));
+          //     this.taskCallbacks.delete(taskId);
+          //     // 更新任务状态
+          //     this.taskStatusMap.set(taskId, {
+          //       taskId,
+          //       status: 'failed',
+          //       error
+          //     });
+          //   }
+          // }, 30000); // 30秒超时
         });
       }
     } catch (err) {
@@ -337,23 +358,6 @@ class HarmonyInferenceClient {
       console.error(`Error: ${errorMsg}`);
       throw new Error(errorMsg);
     }
-  }
-
-  // 取消任务
-  public cancelTask(taskId: string): boolean {
-    const callback = this.taskCallbacks.get(taskId);
-    if (callback) {
-      callback.reject(new Error('Task cancelled'));
-      this.taskCallbacks.delete(taskId);
-      // 更新任务状态
-      this.taskStatusMap.set(taskId, {
-        taskId,
-        status: 'failed',
-        error: 'Task cancelled'
-      });
-      return true;
-    }
-    return false;
   }
 
 }
