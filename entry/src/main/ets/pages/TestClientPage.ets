@@ -40,7 +40,7 @@ export struct TestClientPage {
     type: InferenceInputType.IMAGE,
     data: {
       // 默认使用entry/src/main/resources/base/media/dog.jpg
-      uri: ''
+      imageData: ''
     },
     params: {
       "maxResults": 5

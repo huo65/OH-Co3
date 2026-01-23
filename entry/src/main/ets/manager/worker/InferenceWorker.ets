@@ -14,9 +14,9 @@ export enum InferenceInputType {
 export interface InferenceParams extends Record<string, string | number | boolean | ArrayBuffer> {}
 
 // 图像输入数据类型
-// TODO 图片传输方式优化，MQTT带宽太低
+
 export interface ImageInputData {
-  uri: string; // 本地图像URI
+  imageData: string; // 图像数据
 }
 
 // 文本输入数据类型

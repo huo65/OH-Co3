@@ -3,8 +3,7 @@ import { ownName } from '../broker/monitor/NodeInfoSyn';
 import { taskDispatch, TaskTransmitData } from '../broker/task/TaskDispatch';
 import { DeviceInfo, systemProfiler } from '../monitor/SystemProfiler';
 import { paramSyn } from '../broker/paramOpt/ParamSyn';
-import { ModelManager } from '../../TestImageTask/ImageIdModelManager';
-import { InferenceTask, InferenceInputType } from '../worker/InferenceWorker';
+import { InferenceTask } from '../worker/InferenceWorker';
 import { systemDateTime } from '@kit.BasicServicesKit';
 
 class Scheduler{
@@ -73,7 +72,7 @@ class Scheduler{
       taskInfo.fromClient = ownName;
       taskInfo.toClient = to;
       taskInfo.interTime = await this.getCurrentTimeAsync();
-      // TODO 针对特殊任务类型，Worker中添加发送数据处理？（还是传输的问题）
+      // TODO 传输带宽问题
       // taskInfo.params.bitmap = await ModelManagerInstance.processImageTOBase64(url);
       taskInfo.params = inferenceTask;
       taskDispatch.sendTask(taskInfo);
