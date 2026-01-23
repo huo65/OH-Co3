@@ -54,9 +54,10 @@ class TaskDispatch{
    * 解析收到的任务
    * @param message
    */
+  // TODO 解析收到任务
   parseTaskMessage(message:string){
     const taskInfo:TaskTransmitData = JSON.parse(message)
-    // TODO 注意会有重复处理
+    // 注意会有重复处理
     if (taskInfo.toClient == ownName) {
       //   做一个任务队列，避免阻塞，同时可以扩展任务流转
       //   GlobalTaskManager.getQueue().addTask(taskInfo);
@@ -68,20 +69,7 @@ class TaskDispatch{
   sendTaskResult(){
 
   }
-  /**
-   *             {
-   "taskId": "idhuo",
-   "fromClient": "oh",
-   "toClient": "Lenovo TB-J607F",
-   "params": {
-   "result": "识别成功 (45ms)
-   Plant: 66%
-   Pattern: 50%
-   Vacation : 50%"
-   }
-   }
-   * @param message
-   */
+  // TODO 解析发回来的任务执行结果
   parseResultMessage(message:string):string{
     const taskResult:TaskResultObj = JSON.parse(message)
     const fromClient = taskResult.fromClient;

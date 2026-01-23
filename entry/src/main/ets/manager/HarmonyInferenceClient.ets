@@ -279,11 +279,11 @@ class HarmonyInferenceClient {
     return this.taskStatusMap.get(taskId);
   }
 
-  // 获取所有任务状态
+  // TODO　维护所有任务状态
   public getAllTaskStatus(): Map<string, TaskStatus> {
     return new Map(this.taskStatusMap);
   }
-  // 处理任务结果
+  // TODO　处理任务结果
   private handleTaskResult(resultData: string): void {
     try {
       // // 解析任务结果

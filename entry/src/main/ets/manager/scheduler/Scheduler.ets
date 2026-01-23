@@ -65,8 +65,6 @@ class Scheduler{
 
     try {
       const time = await this.getCurrentTimeAsync();
-      // TODO 测试后删除
-      console.info(`Succeeded in getting currentTime : ${time}`);
       taskInfo.taskId = time.toString();
       taskInfo.fromClient = ownName;
       taskInfo.toClient = to;
