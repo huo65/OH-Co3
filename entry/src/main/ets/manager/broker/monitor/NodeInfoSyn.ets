@@ -2,7 +2,6 @@ import { DeviceInfo } from '../../monitor/SystemProfiler'
 import { MQTTClient } from '../MQTTClient'
 import {MQTTOption} from '../MQTTConfig'
 import HashMap from '@ohos.util.HashMap'
-import deviceInfo from '@ohos.deviceInfo';
 import { systemDateTime } from '@kit.BasicServicesKit';
 
 interface NodeInfoObj {
@@ -70,7 +69,7 @@ class NodeInfoSyn{
       const nodeInfoObj:NodeInfoObj = JSON.parse(message);
       const newDeviceName:string = nodeInfoObj.deviceName;
 
-      if (ownName == newDeviceName) {
+      if (ownName != newDeviceName) {
         const params:DeviceInfo = nodeInfoObj.params;
         const newNodeInfo: DeviceInfo = {
           deviceName: newDeviceName,
@@ -80,14 +79,12 @@ class NodeInfoSyn{
           batteryLevel: parseFloat(params.batteryLevel.toFixed(2)),
           latency: parseFloat(params.latency.toFixed(2))
         };
-        // Remove existing entry with the same device name if exists
         this.otherNodeInfo = this.otherNodeInfo.filter(node => node.deviceName !== newDeviceName);
-        console.log("huoADD:" + newDeviceName);
+        console.log("device ADD:" + newDeviceName);
 
-        // Add new node info
         this.otherNodeInfo.push(newNodeInfo);
       } else {
-        console.log("huoNO");
+        console.log("device self");
       }
     } catch (e) {
       console.error("Error parsing message:", e);

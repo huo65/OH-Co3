@@ -10,30 +10,29 @@ class Scheduler{
   private static SchedulerInstance: Scheduler
 
   private deviceInfos:HashMap<string,DeviceInfo> = new HashMap();
-  // 与原项目解耦合
-  workScheduler(task: InferenceTask, logMessages: Array<string>):Boolean{
-    logMessages.push('[3/6] 调度处理')
-    this.deviceInfos =  systemProfiler.getDeviceInfos();
 
+  workScheduler(task: InferenceTask, logMessages: Array<string>):Boolean{
+    this.deviceInfos =  systemProfiler.getDeviceInfos();
     let highestScoreNode: [string, DeviceInfo] | undefined = undefined;
 
-    for (let entry of this.deviceInfos.entries()) {
-      const key = entry[0];
-      const nodeInfo = entry[1];
-
-      const score = this.calculate_score(nodeInfo);
-
-      if (!highestScoreNode || score > this.calculate_score(highestScoreNode[1])) {
-        highestScoreNode = entry;
+    try {
+      for (let entry of this.deviceInfos.entries()) {
+        const key = entry[0];
+        const nodeInfo = entry[1];
+        const score = this.calculate_score(nodeInfo);
+        if (!highestScoreNode || score > this.calculate_score(highestScoreNode[1])) {
+          highestScoreNode = entry;
+        }
       }
+    } catch (error) {
+      console.error("Failed to send task:", error);
     }
 
     if (highestScoreNode) {
       console.log(`Highest score node id: ${highestScoreNode[0]}, Score: ${this.calculate_score(highestScoreNode[1])}`);
       if (highestScoreNode[0] != ownName) {
-        logMessages.push('[4/6] 任务发送到其他节点')
         this.dispatchTask(task, highestScoreNode[0])
-        logMessages.push('[5/6] 任务发送成功')
+        console.log('任务发送到其他节点')
         return false
       }
     } else {
@@ -64,13 +63,11 @@ class Scheduler{
     let taskInfo: TaskTransmitData = new TaskTransmitData();
 
     try {
-      const time = await this.getCurrentTimeAsync();
+      const time = systemDateTime.getTime(true);
       taskInfo.taskId = time.toString();
       taskInfo.fromClient = ownName;
       taskInfo.toClient = to;
-      taskInfo.interTime = await this.getCurrentTimeAsync();
-      // TODO 传输带宽问题
-      // taskInfo.params.bitmap = await ModelManagerInstance.processImageTOBase64(url);
+      taskInfo.interTime = time;
       taskInfo.params = inferenceTask;
       taskDispatch.sendTask(taskInfo);
     } catch (error) {
@@ -78,11 +75,5 @@ class Scheduler{
     }
   }
 
-  // 使用封装的 Promise 方法获取当前时间
-  private getCurrentTimeAsync(): Promise<number> {
-    return new Promise((resolve, reject) => {
-      systemDateTime.getTime(true)
-    });
-  }
 }
 export { Scheduler };

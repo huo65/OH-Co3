@@ -1,20 +1,9 @@
 import { InferenceTask } from '../../HarmonyInferenceClient';
-import { ImageInputData, InferenceInputType } from '../../worker/InferenceWorker';
+import { GlobalTaskManager } from '../../worker/GlobalTaskManager';
+import { InferenceResult, InferenceInputType } from '../../worker/InferenceWorker';
 import { ownName } from '../monitor/NodeInfoSyn';
 import { MQTTClient } from '../MQTTClient'
 
-interface TaskParams {
-  bitmap: string;
-}
-interface TaskResultObj{
-  taskId: string,
-  fromClient:string,
-  toClient:string,
-  params:ResultInfo
-}
-interface ResultInfo{
-  result:string
-}
 
 class TaskTransmitData {
   taskId: string;
@@ -30,6 +19,18 @@ class TaskTransmitData {
     this.params = {taskId:"" , modelName:"", type: InferenceInputType.IMAGE, data : { imageData :""} };
   }
 }
+class TaskResTransmitData {
+  taskId: string;
+  fromClient: string;
+  toClient: string;
+  params: InferenceResult;
+  constructor() {
+    this.taskId = "";
+    this.fromClient = "";
+    this.toClient = "";
+    this.params = {success:false};
+  }
+}
 class TaskDispatch{
 
   /**
@@ -43,7 +44,7 @@ class TaskDispatch{
     const taskInfoMessage = JSON.stringify({
       taskInfo
     });
-    MQTTInstance.pushMessage(taskInfoMessage,"task/assign");
+    MQTTInstance.pushMessage(taskInfoMessage,"/task/assign");
     return true;
   } catch (e) {
     console.error(e);
@@ -59,28 +60,34 @@ class TaskDispatch{
     const taskInfo:TaskTransmitData = JSON.parse(message)
     // 注意会有重复处理
     if (taskInfo.toClient == ownName) {
-      //   做一个任务队列，避免阻塞，同时可以扩展任务流转
-      //   GlobalTaskManager.getQueue().addTask(taskInfo);
-
+      // 本地执行推理，添加到全局任务队列
+      console.info('Adding inference task to local queue');
+      const result = GlobalTaskManager.getQueue().addTask(taskInfo.params);
     }
 
   }
   // TODO 发送任务执行的结果
-  sendTaskResult(){
+  sendTaskResult(inferenceResult:TaskResTransmitData){
+    const MQTTInstance: MQTTClient = MQTTClient.getInstance()
+    try {
+      const taskResMessage = JSON.stringify({
+        TaskResTransmitData
+      });
+      MQTTInstance.pushMessage(taskResMessage,"/task/result");
+    } catch (e) {
+      console.error(e);
+    }
 
   }
   // TODO 解析发回来的任务执行结果
   parseResultMessage(message:string):string{
-    const taskResult:TaskResultObj = JSON.parse(message)
+    const taskResult:TaskResTransmitData = JSON.parse(message);
     const fromClient = taskResult.fromClient;
     if (fromClient == ownName) {
-      return taskResult.params.result;
+      return "taskResult.message";
     }
     return ""
   }
-
-
-
 
 
 }
