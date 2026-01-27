@@ -41,9 +41,7 @@ class TaskDispatch{
   async sendTask(taskInfo: TaskTransmitData): Promise<boolean> {
     const MQTTInstance: MQTTClient = MQTTClient.getInstance()
   try {
-    const taskInfoMessage = JSON.stringify({
-      taskInfo
-    });
+    const taskInfoMessage = JSON.stringify(taskInfo);
     MQTTInstance.pushMessage(taskInfoMessage,"/task/assign");
     return true;
   } catch (e) {
@@ -55,24 +53,32 @@ class TaskDispatch{
    * 解析收到的任务
    * @param message
    */
-  // TODO 解析收到任务
-  parseTaskMessage(message:string){
+  async parseTaskMessage(message:string){
     const taskInfo:TaskTransmitData = JSON.parse(message)
+    console.info('收到任务消息',taskInfo.taskId);
     // 注意会有重复处理
     if (taskInfo.toClient == ownName) {
       // 本地执行推理，添加到全局任务队列
-      console.info('Adding inference task to local queue');
-      const result = GlobalTaskManager.getQueue().addTask(taskInfo.params);
+      console.info('收到分配任务');
+      const taskQueue = GlobalTaskManager.getQueue()
+      const result = await taskQueue.addTask(taskInfo.params);
+      const  taskResTransmitData:TaskResTransmitData = new TaskResTransmitData()
+      taskResTransmitData.taskId = taskInfo.taskId;
+      taskResTransmitData.fromClient = taskInfo.fromClient;
+      taskResTransmitData.toClient = taskInfo.toClient;
+      taskResTransmitData.params = result;
+      this.sendTaskResult(taskResTransmitData)
+
     }
 
   }
-  // TODO 发送任务执行的结果
   sendTaskResult(inferenceResult:TaskResTransmitData){
     const MQTTInstance: MQTTClient = MQTTClient.getInstance()
     try {
-      const taskResMessage = JSON.stringify({
-        TaskResTransmitData
-      });
+      const taskResMessage = JSON.stringify(
+        inferenceResult
+      );
+      console.info('发送分配任务结果');
       MQTTInstance.pushMessage(taskResMessage,"/task/result");
     } catch (e) {
       console.error(e);
