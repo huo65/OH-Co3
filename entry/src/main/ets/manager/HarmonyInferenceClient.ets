@@ -116,7 +116,7 @@ class HarmonyInferenceClient {
   // 初始化事件监听器
   private initEventListeners(): void {
     if (this.mqttClient) {
-      // 转移到初始化逻辑this.mqttClient.subscribeTopic(["/device/list","/device/status","/task/assign","/task/result","/optimization/param","/test/latency"])
+
       emitter.on({
         eventId: EVENTID
       }, (data) => {
@@ -292,7 +292,7 @@ class HarmonyInferenceClient {
   public getAllTaskStatus(): Map<string, TaskStatus> {
     return new Map(this.taskStatusMap);
   }
-  // TODO　处理任务结果
+
   private handleTaskResult(resultData: string): void {
     try {
       console.log("结果处理进入",resultData)

@@ -85,7 +85,7 @@ class TaskDispatch{
     }
 
   }
-  // TODO 解析发回来的任务执行结果
+
   parseResultMessage(message:string):TaskResTransmitData | null{
     const taskResult:TaskResTransmitData = JSON.parse(message);
     const fromClient = taskResult.fromClient;

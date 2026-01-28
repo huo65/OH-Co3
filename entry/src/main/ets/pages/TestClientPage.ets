@@ -5,12 +5,6 @@ import { SelectTitleBar } from '@kit.ArkUI';
 import { ModelManager } from '../TestImageTask/ImageIdModelManager';
 import deviceInfo from '@ohos.deviceInfo';
 
-interface UsageItem {
-  icon: Resource
-  name: string
-  value: string
-  unit: string
-}
 
 // @Entry
 @Component
@@ -27,7 +21,7 @@ export struct TestClientPage {
   // MQTT配置
   private mqttConfig: MQTTConfig = {
     url: 'mqtt://10.218.227.159:1883',
-    // clientId: deviceInfo.marketName + "_" + Math.floor(Math.random() * 10000),
+    //测试防止重复 clientId: deviceInfo.marketName + "_" + Math.floor(Math.random() * 10000),
     clientId: deviceInfo.marketName,
     userName: 'root',
     password: 'admin',
