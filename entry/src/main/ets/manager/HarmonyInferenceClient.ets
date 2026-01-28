@@ -59,7 +59,7 @@ class HarmonyInferenceClient {
   private defaultWorker: ModelManager;
   private isInitialized: boolean = false;
   private modelName: string = '';
-  //存疑
+  //TODO 后续拓展任务状态监控（放在Schedule
   private taskStatusMap: Map<string, TaskStatus> = new Map();
 
   private taskResultMap: Map<string, InferenceResult> = new Map();
@@ -287,7 +287,6 @@ class HarmonyInferenceClient {
     return this.taskStatusMap.get(taskId);
   }
 
-  // TODO　维护所有任务状态
   public getAllTaskStatus(): Map<string, TaskStatus> {
     return new Map(this.taskStatusMap);
   }

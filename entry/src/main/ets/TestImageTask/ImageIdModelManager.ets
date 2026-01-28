@@ -206,7 +206,7 @@ class ImageIdModelManager implements InferenceWorker {
     if (!this.isInit) {
       return {
         success: false,
-        message: 'Model not initialized'
+        message: 'Model not initialized',
       };
     }
     
@@ -228,8 +228,11 @@ class ImageIdModelManager implements InferenceWorker {
     
     return {
       success: true,
-      maxArray: predictResult.maxArray,
-      maxIndexArray: predictResult.maxIndexArray
+      message:"识别成功",
+      result:{
+        maxArray: predictResult.maxArray,
+        maxIndexArray: predictResult.maxIndexArray
+      }
     };
   }
 

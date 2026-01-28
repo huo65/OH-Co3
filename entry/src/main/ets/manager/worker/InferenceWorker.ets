@@ -1,3 +1,16 @@
+// 推理任务参数
+export interface InferenceTask {
+  // 任务相关字段
+  taskId: string;
+  modelName?: string;
+
+  // 推理输入字段
+  type: InferenceInputType;
+  data: ImageInputData | TextInputData | AudioInputData | ArrayBuffer;
+  params?: Record<string, string | number | boolean | ArrayBuffer>;
+
+}
+
 // 推理任务输入类型枚举
 export enum InferenceInputType {
   IMAGE = 'image',
@@ -7,14 +20,7 @@ export enum InferenceInputType {
   OTHER = 'other'
 }
 
-// 推理任务参数类型
-// export interface InferenceParams {
-//   [key: string]: string | number | boolean | ArrayBuffer;
-// }
-export interface InferenceParams extends Record<string, string | number | boolean | ArrayBuffer> {}
-
 // 图像输入数据类型
-
 export interface ImageInputData {
   imageData: string; // 图像数据
 }
@@ -31,36 +37,40 @@ export interface AudioInputData {
   channels: number; // 声道数
 }
 
-// 推理结果类型TODO 进一步封装
+// 推理结果类型
 export interface InferenceResult {
-  // 通用结果字段
+  // 执行状态
   success: boolean;
+  // 附加信息（可选
   message?: string;
-  
-  // 图像识别特定结果（可选）
-  maxArray?: number[];
-  maxIndexArray?: number[];
-  
-  // 文本识别特定结果（可选）
-  textResult?: string;
-  confidence?: number;
-  
-  // 自定义结果数据（可选）
-  customData?: ArrayBuffer;
+  // 结果数据
+  result?: ImageResult | TextResult | AudioResult  | CustomResult
+}
+// 图像识别结果（IMAGE类型专用）
+interface ImageResult {
+  maxArray?: number[];      // 置信度数组
+  maxIndexArray?: number[]; // 最大索引数组
 }
 
-// 推理任务参数
-export interface InferenceTask {
-  // 任务相关字段
-  taskId: string;
-  modelName?: string;
-  
-  // 推理输入字段
-  type: InferenceInputType;
-  data: ImageInputData | TextInputData | AudioInputData | ArrayBuffer;
-  params?: Record<string, string | number | boolean | ArrayBuffer>;
-
+// 文本处理结果（TEXT类型专用）
+interface TextResult {
+  recognizedText: string;   // 识别文本
+  confidence?: number;      // 置信度
 }
+
+// 音频处理结果（AUDIO类型专用）
+interface AudioResult {
+  transcription: string;    // 语音转文字结果
+  buffer?: ArrayBuffer;     // 处理后的音频数据
+}
+
+// 自定义类型结果（OTHER类型专用）
+interface CustomResult {
+  data: ArrayBuffer;        // 原始二进制数据
+  metadata?: string;        // 元数据描述
+}
+
+
 
 // 推理Worker接口
 export interface InferenceWorker {

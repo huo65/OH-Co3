@@ -14,7 +14,6 @@ class Scheduler{
   workScheduler(task: InferenceTask, logMessages: Array<string>):Boolean{
     this.deviceInfos =  systemProfiler.getDeviceInfos();
     let highestScoreNode: [string, DeviceInfo] | undefined = undefined;
-    // TODO 对齐专利内容
     try {
       for (let entry of this.deviceInfos.entries()) {
         const key = entry[0];

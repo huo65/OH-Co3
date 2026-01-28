@@ -13,9 +13,8 @@ export struct TestClientPage {
   private isInitialized: boolean = false;
   private ImageModelWorker:InferenceWorker = ModelManager.getInstance()
   @State connectionStatus: string = 'Disconnected';
-  private testResult: string = '';
-  @State
-  private logMessages: string[] = [];
+  @State testResult: string = '';
+  @State logMessages: string[] = [];
   @State systemStatus: SystemStatus | null = null;
 
   // MQTT配置
