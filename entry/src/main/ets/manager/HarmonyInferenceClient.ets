@@ -112,7 +112,6 @@ class HarmonyInferenceClient {
     }
 
   }
-  // TODO 监听任务处理封装整理全链路
   // 初始化事件监听器
   private initEventListeners(): void {
     if (this.mqttClient) {

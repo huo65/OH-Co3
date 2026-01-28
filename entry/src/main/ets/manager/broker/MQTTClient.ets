@@ -158,23 +158,25 @@ class MQTTClient {
         if (data.topic == "/task/result") {
           emitter.emit({
             eventId: RESULT_EVENT_ID,
-            priority: emitter.EventPriority.LOW // 表示事件优于IDLE优先级投递，事件的默认优先级是LOW。
+            priority: emitter.EventPriority.IMMEDIATE
           }, {
             data: {
               content: data.payload,
             }
           })
+        }else {
+          // 发送消息至线程
+          emitter.emit({
+            eventId: EVENTID,
+            priority: emitter.EventPriority.HIGH // 表示事件优于IDLE优先级投递，事件的默认优先级是LOW。
+          }, {
+            data: {
+              topic: data.topic,
+              content: data.payload
+            }
+          })
         }
-        // 发送消息至线程
-        emitter.emit({
-          eventId: EVENTID,
-          priority: emitter.EventPriority.LOW // 表示事件优于IDLE优先级投递，事件的默认优先级是LOW。
-        }, {
-          data: {
-            topic: data.topic,
-            content: data.payload
-          }
-        })
+
       }
     })
   }
