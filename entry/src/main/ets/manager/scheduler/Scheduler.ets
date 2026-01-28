@@ -66,7 +66,7 @@ class Scheduler{
       taskInfo.taskId = inferenceTask.taskId;
       taskInfo.fromClient = ownName;
       taskInfo.toClient = to;
-      taskInfo.interTime = time;
+      taskInfo.timestamp = time;
       taskInfo.params = inferenceTask;
       taskDispatch.sendTask(taskInfo);
     } catch (error) {

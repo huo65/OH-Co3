@@ -3,19 +3,20 @@ import { GlobalTaskManager } from '../../worker/GlobalTaskManager';
 import { InferenceResult, InferenceInputType } from '../../worker/InferenceWorker';
 import { ownName } from '../monitor/NodeInfoSyn';
 import { MQTTClient } from '../MQTTClient'
+import { systemDateTime } from '@kit.BasicServicesKit';
 
 
 class TaskTransmitData {
   taskId: string;
   fromClient: string;
   toClient: string;
-  interTime: number;//记录接收时间，之后计算总耗时
+  timestamp: number;//记录时间，之后计算总耗时
   params: InferenceTask;
   constructor() {
     this.taskId = "";
     this.fromClient = "";
     this.toClient = "";
-    this.interTime = 0;
+    this.timestamp = 0;
     this.params = {taskId:"" , modelName:"", type: InferenceInputType.IMAGE, data : { imageData :""} };
   }
 }
@@ -23,11 +24,13 @@ class TaskResTransmitData {
   taskId: string;
   fromClient: string;
   toClient: string;
+  timestamp: number;//记录时间，之后计算总耗时
   params: InferenceResult;
   constructor() {
     this.taskId = "";
     this.fromClient = "";
     this.toClient = "";
+    this.timestamp = 0;
     this.params = {success:false};
   }
 }
@@ -67,6 +70,7 @@ class TaskDispatch{
       taskResTransmitData.fromClient = taskInfo.fromClient;
       taskResTransmitData.toClient = taskInfo.toClient;
       taskResTransmitData.params = result;
+      taskResTransmitData.timestamp = systemDateTime.getTime(true);
       this.sendTaskResult(taskResTransmitData)
 
     }
