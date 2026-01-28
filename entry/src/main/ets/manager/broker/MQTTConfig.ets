@@ -4,7 +4,8 @@ import deviceInfo from '@ohos.deviceInfo';
 // TODO 后续删除这个的相关引用(收发任务测试成功后
 export const MQTTOption: MQTTOptionsType = {
   url: 'mqtt://10.123.74.159:1883',
-  clientId: deviceInfo.marketName + "_" + Math.floor(Math.random() * 10000),
+  // clientId: deviceInfo.marketName + "_" + Math.floor(Math.random() * 10000),
+  clientId: deviceInfo.marketName,
   userName: 'root',
   password: 'admin',
   topic: '/test/123',

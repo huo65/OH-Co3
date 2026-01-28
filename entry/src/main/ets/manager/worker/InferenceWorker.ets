@@ -31,7 +31,7 @@ export interface AudioInputData {
   channels: number; // 声道数
 }
 
-// 推理结果类型
+// 推理结果类型TODO 进一步封装
 export interface InferenceResult {
   // 通用结果字段
   success: boolean;
@@ -52,7 +52,7 @@ export interface InferenceResult {
 // 推理任务参数
 export interface InferenceTask {
   // 任务相关字段
-  taskId?: string;
+  taskId: string;
   modelName?: string;
   
   // 推理输入字段

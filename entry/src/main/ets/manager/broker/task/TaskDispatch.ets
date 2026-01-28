@@ -86,16 +86,19 @@ class TaskDispatch{
 
   }
   // TODO 解析发回来的任务执行结果
-  parseResultMessage(message:string):string{
+  parseResultMessage(message:string):TaskResTransmitData | null{
     const taskResult:TaskResTransmitData = JSON.parse(message);
     const fromClient = taskResult.fromClient;
+    console.log("结果处理解析",fromClient)
+    console.log("结果处理判断",ownName)
     if (fromClient == ownName) {
-      return "taskResult.message";
+      console.log("结果处理返回",ownName)
+      return taskResult;
     }
-    return ""
+    return null;
   }
 
 
 }
 export const taskDispatch = new TaskDispatch();
-export {TaskTransmitData}
+export {TaskTransmitData,TaskResTransmitData}

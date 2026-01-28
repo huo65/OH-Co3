@@ -6,7 +6,7 @@ import systemDateTime from '@ohos.systemDateTime';
 import { taskDispatch } from '../../manager/broker/task/TaskDispatch';
 import emitter from '@ohos.events.emitter';
 import { nodeInfoSyn } from '../../manager/broker/monitor/NodeInfoSyn';
-import { RESULT } from '../../manager/broker/MQTTClient';
+import { RESULT_EVENT_ID } from '../../manager/broker/MQTTClient';
 import { DataPass, RealDataPass } from './BrokerScreen';
 import { ModelManager } from '../../TestImageTask/ImageIdModelManager';
 
@@ -124,16 +124,16 @@ export struct MindSpore {
   aboutToAppear(): void {
     // 由于结果需要实时反馈，此处非统一处理逻辑
     emitter.on({
-      eventId: RESULT
+      eventId: RESULT_EVENT_ID
     }, (data) => {
       let message:string = JSON.stringify(data)
       let dataMessage:DataPass = JSON.parse(message)
       let realData:string = JSON.stringify(dataMessage.data)
       let realMessage:RealDataPass = JSON.parse(realData)
-      let res =  taskDispatch.parseResultMessage(realMessage.content);
-      if (res != "") {
-        this.logMessages.push("[6/6] 结果接收成功"+res)
-      }
+      // let res =  taskDispatch.parseResultMessage(realMessage.content);
+      // if (res != "") {
+      //   this.logMessages.push("[6/6] 结果接收成功"+res)
+      // }
 
     });
   }

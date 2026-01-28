@@ -26,8 +26,9 @@ export struct TestClientPage {
 
   // MQTT配置
   private mqttConfig: MQTTConfig = {
-    url: 'mqtt://10.51.155.159:1883',
-    clientId: deviceInfo.marketName + "_" + Math.floor(Math.random() * 10000),
+    url: 'mqtt://10.218.227.159:1883',
+    // clientId: deviceInfo.marketName + "_" + Math.floor(Math.random() * 10000),
+    clientId: deviceInfo.marketName,
     userName: 'root',
     password: 'admin',
     topic: '/test/123',

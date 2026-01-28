@@ -11,7 +11,7 @@ import emitter from '@ohos.events.emitter';
 
 // 事件id
 const EVENTID = 1001
-const RESULT = 1002
+const RESULT_EVENT_ID = 1002
 interface MQTTOptionsType {
   url?: string
   clientId?: string
@@ -155,9 +155,9 @@ class MQTTClient {
         console.error('MQTT接收消息失败：', JSON.stringify(err))
       } else {
         console.info('MQTT接收消息成功：', JSON.stringify(data))
-        if (data.topic == "task/result") {
+        if (data.topic == "/task/result") {
           emitter.emit({
-            eventId: RESULT,
+            eventId: RESULT_EVENT_ID,
             priority: emitter.EventPriority.LOW // 表示事件优于IDLE优先级投递，事件的默认优先级是LOW。
           }, {
             data: {
@@ -217,4 +217,4 @@ class MQTTClient {
   }
 }
 
-export { MQTTClient, EVENTID, MQTTOptionsType, RESULT };
+export { MQTTClient, EVENTID, MQTTOptionsType, RESULT_EVENT_ID };

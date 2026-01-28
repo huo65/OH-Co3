@@ -1,4 +1,4 @@
-import { EVENTID, MQTTClient, MQTTOptionsType } from './broker/MQTTClient';
+import { EVENTID, MQTTClient, MQTTOptionsType, RESULT_EVENT_ID } from './broker/MQTTClient';
 import { MqttQos } from '@ohos/mqtt';
 import { Scheduler } from './scheduler/Scheduler';
 import { ModelManager } from '../TestImageTask/ImageIdModelManager';
@@ -9,10 +9,11 @@ import HashMap from '@ohos.util.HashMap';
 import emitter from '@ohos.events.emitter';
 import { nodeInfoSyn } from './broker/monitor/NodeInfoSyn';
 import { paramSyn } from './broker/paramOpt/ParamSyn';
-import { taskDispatch } from './broker/task/TaskDispatch';
+import { taskDispatch,TaskResTransmitData} from './broker/task/TaskDispatch';
+import { MQTTOption } from './broker/MQTTConfig';
 
 // 事件ID定义
-const RESULT_EVENT_ID = 1002;
+// const RESULT_EVENT_ID = 1002;
 export interface DataPass {
   data:string;
 }
@@ -60,6 +61,8 @@ class HarmonyInferenceClient {
   private modelName: string = '';
   //存疑
   private taskStatusMap: Map<string, TaskStatus> = new Map();
+
+  private taskResultMap: Map<string, InferenceResult> = new Map();
 
   // 私有构造函数
   private constructor() {
@@ -109,7 +112,7 @@ class HarmonyInferenceClient {
     }
 
   }
-  // TODO 监听任务处理封装
+  // TODO 监听任务处理封装整理全链路
   // 初始化事件监听器
   private initEventListeners(): void {
     if (this.mqttClient) {
@@ -140,7 +143,12 @@ class HarmonyInferenceClient {
         eventId: RESULT_EVENT_ID,
         priority: emitter.EventPriority.LOW
       }, (eventData) => {
-        this.handleTaskResult(eventData.data?.content);
+        console.log("结果处理事件监听")
+        let message:string = JSON.stringify(eventData)
+        let dataMessage:DataPass = JSON.parse(message)
+        let realData:string = JSON.stringify(dataMessage.data)
+        let realMessage:RealDataPass = JSON.parse(realData)
+        this.handleTaskResult(realMessage.content);
       });
     }
 
@@ -159,6 +167,7 @@ class HarmonyInferenceClient {
     }
 
     try {
+      MQTTOption.clientId = config.clientId;
       await this.initMQTTClient(config)
       this.initEventListeners()
 
@@ -286,23 +295,13 @@ class HarmonyInferenceClient {
   // TODO　处理任务结果
   private handleTaskResult(resultData: string): void {
     try {
-      // // 解析任务结果
-      // const result = JSON.parse(resultData);
-      // // 查找对应的任务回调
-      // // 这里需要根据实际的任务ID解析逻辑进行调整
-      // // 暂时使用模拟的任务ID
-      // const taskId = 'test-task-id';
-      // const callback = this.taskCallbacks.get(taskId);
-      // if (callback) {
-      //   callback.resolve(result);
-      //   this.taskCallbacks.delete(taskId);
-      //   // 更新任务状态
-      //   this.taskStatusMap.set(taskId, {
-      //     taskId,
-      //     status: 'completed',
-      //     result
-      //   });
-      // }
+      console.log("结果处理进入",resultData)
+      const taskResult:TaskResTransmitData | null = taskDispatch.parseResultMessage(resultData);
+      if (taskResult != null) {
+        console.log("结果处理完成存入Map",taskResult.taskId)
+        this.taskResultMap.set(taskResult.taskId,taskResult.params);
+      }
+
     } catch (error) {
       console.error('Error handling task result:', error);
     }
@@ -328,32 +327,24 @@ class HarmonyInferenceClient {
         const result = await GlobalTaskManager.getQueue().addTask(task);
         return result;
       } else {
+        const taskId:string = task.taskId as string;
+        console.log("结果处理目标",taskId)
         // 任务已发送到其他设备，需要等待结果
         return new Promise((resolve, reject) => {
-          console.info('Task sent to remote device, waiting for result');
-          // 生成唯一任务ID
-          const taskId = `task-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+          const checkInterval = setInterval(() => {
+            const result = this.taskResultMap.get(taskId);
+            if (result !== undefined && result !== null) {
+              clearInterval(checkInterval);
+              this.taskResultMap.delete(taskId);
+              console.log("结果处理返回",result.success)
+              resolve(result);
+            }
+          }, 100); // 每100ms检查一次结果
 
-          // 更新任务状态
-          this.taskStatusMap.set(taskId, {
-            taskId,
-            status: 'pending'
-          });
-
-          // // 设置超时处理
-          // setTimeout(() => {
-          //   if (this.taskCallbacks.has(taskId)) {
-          //     const error = 'Task timeout';
-          //     reject(new Error(error));
-          //     this.taskCallbacks.delete(taskId);
-          //     // 更新任务状态
-          //     this.taskStatusMap.set(taskId, {
-          //       taskId,
-          //       status: 'failed',
-          //       error
-          //     });
-          //   }
-          // }, 30000); // 30秒超时
+          setTimeout(() => {
+            clearInterval(checkInterval);
+            reject(new Error('Task timeout after 30 seconds'));
+          }, 30000);
         });
       }
     } catch (err) {
