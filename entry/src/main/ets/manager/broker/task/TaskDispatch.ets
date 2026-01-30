@@ -70,7 +70,7 @@ class TaskDispatch{
       taskResTransmitData.fromClient = taskInfo.fromClient;
       taskResTransmitData.toClient = taskInfo.toClient;
       taskResTransmitData.params = result;
-      taskResTransmitData.timestamp = systemDateTime.getTime(true);
+      taskResTransmitData.timestamp = systemDateTime.getTime(false);
       this.sendTaskResult(taskResTransmitData)
 
     }

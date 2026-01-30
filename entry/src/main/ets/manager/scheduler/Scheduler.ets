@@ -62,7 +62,7 @@ class Scheduler{
     let taskInfo: TaskTransmitData = new TaskTransmitData();
 
     try {
-      const time = systemDateTime.getTime(true);
+      const time = systemDateTime.getTime(false);
       taskInfo.taskId = inferenceTask.taskId;
       taskInfo.fromClient = ownName;
       taskInfo.toClient = to;
