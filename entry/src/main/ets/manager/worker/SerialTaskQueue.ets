@@ -54,10 +54,10 @@ export class SerialTaskQueue {
     }
     
     this.isProcessing = true;
-    
+    let taskInfo: TaskInfo|null = null
     try {
       // 取出队列中的第一个任务
-      const taskInfo: TaskInfo = this.taskQueue.getFirst()!;
+      taskInfo = this.taskQueue.getFirst()!;
       console.info(`[SerialTaskQueue] Processing task: ${taskInfo.taskId}`);
       
       // 执行推理
@@ -68,6 +68,9 @@ export class SerialTaskQueue {
       console.info(`[SerialTaskQueue] Task completed: ${taskInfo.taskId}`);
     } catch (error) {
       console.error(`[SerialTaskQueue] Task execution failed: ${error}`);
+      if (taskInfo) {
+        taskInfo.reject(error as Error);
+      }
     } finally {
       this.isProcessing = false;
       
