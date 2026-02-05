@@ -1,4 +1,5 @@
 import { InferenceTask, InferenceResult, InferenceWorker } from './InferenceWorker';
+import { Deque, LinkedList } from '@kit.ArkTS';
 
 // 任务信息接口
 export interface TaskInfo {
@@ -10,7 +11,7 @@ export interface TaskInfo {
 }
 
 export class SerialTaskQueue {
-  private taskQueue: TaskInfo[] = [];
+  private taskQueue: LinkedList<TaskInfo> = new LinkedList();
   private isProcessing: boolean = false;
   private worker: InferenceWorker;
 
@@ -31,8 +32,12 @@ export class SerialTaskQueue {
         reject: reject,
         createdAt: Date.now()
       };
-      
-      this.taskQueue.push(taskInfo);
+
+      try {
+        this.taskQueue.add(taskInfo);
+      } catch (error) {
+        console.error(`[SerialTaskQueue] Task add failed: ${error}`);
+      }
       console.info(`[SerialTaskQueue] Task added to queue: ${taskId}, queue length: ${this.taskQueue.length}`);
       
       // 如果当前没有在处理任务，立即开始处理
@@ -52,7 +57,7 @@ export class SerialTaskQueue {
     
     try {
       // 取出队列中的第一个任务
-      const taskInfo: TaskInfo = this.taskQueue.shift()!;
+      const taskInfo: TaskInfo = this.taskQueue.getFirst()!;
       console.info(`[SerialTaskQueue] Processing task: ${taskInfo.taskId}`);
       
       // 执行推理
@@ -75,7 +80,14 @@ export class SerialTaskQueue {
 
   // 清空任务
   shutdown(): void {
-    this.taskQueue = [];
+    try {
+      this.taskQueue.forEach(task => {
+        task.reject(new Error('Queue shutdown'));
+      });
+      this.taskQueue.clear();
+    } catch (error) {
+      console.error(`[SerialTaskQueue] Task clear failed: ${error}`);
+    }
     this.isProcessing = false;
     console.log('[SerialTaskQueue] 队列已关闭');
   }
@@ -85,28 +97,4 @@ export class SerialTaskQueue {
     return this.taskQueue.length;
   }
 
-  // 取消指定任务
-  cancelTask(taskId: string): boolean {
-    let taskIndex: number = -1;
-    
-    // 查找任务在队列中的索引
-    for (let i: number = 0; i < this.taskQueue.length; i++) {
-      if (this.taskQueue[i].taskId === taskId) {
-        taskIndex = i;
-        break;
-      }
-    }
-    
-    if (taskIndex >= 0) {
-      // 从队列中移除任务
-      const taskInfo: TaskInfo = this.taskQueue.splice(taskIndex, 1)[0];
-      
-      // 拒绝任务
-      taskInfo.reject(new Error('Task cancelled'));
-      console.info(`[SerialTaskQueue] Task cancelled: ${taskId}`);
-      return true;
-    }
-    
-    return false;
-  }
 }
