@@ -57,7 +57,8 @@ export class SerialTaskQueue {
     let taskInfo: TaskInfo|null = null
     try {
       // 取出队列中的第一个任务
-      taskInfo = this.taskQueue.getFirst()!;
+      // taskInfo = this.taskQueue.getFirst()!;
+      taskInfo = this.taskQueue.removeFirst();
       console.info(`[SerialTaskQueue] Processing task: ${taskInfo.taskId}`);
       
       // 执行推理
