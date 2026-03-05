@@ -53,7 +53,7 @@ struct Index {
         // Performance()
         TestClientPage()
       }
-      .tabBar(this.TabBuilder('性能', 0, $r('app.media.xn'), $r('app.media.xn2')))
+      .tabBar(this.TabBuilder('测试页面', 0, $r('app.media.xn'), $r('app.media.xn2')))
 
       // TabContent() {
       //   MindSpore()
