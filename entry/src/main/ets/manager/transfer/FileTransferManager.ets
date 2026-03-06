@@ -116,7 +116,10 @@ export class FileTransferManager {
     targetDevice: string,
     notifyCallback?: TCPNotifyCallback
   ): Promise<string> {
-    const taskId = `task_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    // 优先复用调用方传入的业务 taskId（fileInfo.fileId），避免重复生成导致追踪不一致
+    const taskId = fileInfo.fileId && fileInfo.fileId.length > 0
+      ? fileInfo.fileId
+      : `task_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
     const protocolName = this.selectProtocol(fileInfo.size);
     console.info(`[FileTransferManager] 任务 ${taskId} 使用协议：${protocolName}`);
 

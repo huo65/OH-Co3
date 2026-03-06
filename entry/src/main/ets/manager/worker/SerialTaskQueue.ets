@@ -22,7 +22,10 @@ export class SerialTaskQueue {
 
   // 添加任务（非阻塞）
   addTask(task: InferenceTask): Promise<InferenceResult> {
-    const taskId: string = `task-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+    // 优先复用 InferenceTask 自身携带的 taskId，保证全链路追踪一致性
+    const taskId: string = task.taskId && task.taskId.length > 0
+      ? task.taskId
+      : `task-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
     
     return new Promise<InferenceResult>((resolve, reject) => {
       const taskInfo: TaskInfo = {
