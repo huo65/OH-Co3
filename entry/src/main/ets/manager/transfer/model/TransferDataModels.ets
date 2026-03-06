@@ -113,6 +113,12 @@ export interface TCPNotifyInfo {
 }
 
 /**
+ * TCP 传输通知回调类型
+ * TCP 服务器就绪后调用，用于通知目标设备发起连接
+ */
+export type TCPNotifyCallback = (notifyInfo: TCPNotifyInfo) => Promise<void>;
+
+/**
  * 传输配置选项
  */
 export interface TransferOptions {

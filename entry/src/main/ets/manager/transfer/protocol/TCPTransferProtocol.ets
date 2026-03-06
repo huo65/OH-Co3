@@ -4,9 +4,10 @@
  */
 import { TransferProtocolInterface, TransferConfig, TransferState, TransferProgress } from '../protocol/TransferProtocolInterface';
 import { FileTransferSocketManager } from '../socket/FileTransferSocketManager';
-import { ChunkData, FileInfo } from '../model/TransferDataModels';
+import { ChunkData, TCPNotifyInfo } from '../model/TransferDataModels';
 import { FileUtils } from '../utils/FileUtils';
 import { TransferEventManager, TransferEventId } from '../event/TransferEvents';
+import { NetworkUtils } from '../utils/NetworkUtils';
 
 /**
  * TCP 握手信息（发送端用）
@@ -116,9 +117,10 @@ export class TCPTransferProtocol implements TransferProtocolInterface {
 
   /**
    * 发送文件数据（支持分块传输）
+   * TCP 作为发送端的完整流程：启动服务器 → 通知目标设备（config.notifyCallback）→ 等待连接 → 分块发送
    * @param data - 文件数据
    * @param taskId - 任务 ID
-   * @param config - 传输配置
+   * @param config - 传输配置，config.notifyCallback 用于通知目标设备发起 TCP 连接
    */
   async send(data: ArrayBuffer | string, taskId: string, config?: TransferConfig): Promise<boolean> {
     try {
@@ -132,6 +134,29 @@ export class TCPTransferProtocol implements TransferProtocolInterface {
 
       const chunkSize = config?.chunkSize || this.DEFAULT_CHUNK_SIZE;
       const maxRetries = config?.maxRetries || this.MAX_RETRIES;
+      const port = this.DEFAULT_PORT;
+
+      // 启动 TCP 服务器监听，等待目标设备主动连接
+      if (!this.isConnected()) {
+        const serverStarted = await this.startServer(port);
+        if (!serverStarted) {
+          throw new Error(`TCP 服务器启动失败，端口=${port}`);
+        }
+      }
+
+      // 服务器就绪，通知目标设备发起连接
+      if (config?.notifyCallback) {
+        const notifyInfo: TCPNotifyInfo = {
+          taskId,
+          sourceIp: NetworkUtils.getIpAddress(),
+          port,
+          fileInfo: { fileId: taskId, fileName: `file_${taskId}`, size: fileData.byteLength }
+        };
+        await config.notifyCallback(notifyInfo);
+        console.info(`[TCPTransferProtocol] 已通知目标设备发起 TCP 连接，taskId=${taskId}`);
+      } else {
+        console.warn(`[TCPTransferProtocol] 未提供 notifyCallback，目标设备可能无法得知需要发起连接`);
+      }
       
       // 计算文件哈希
       const fileHash = await FileUtils.calculateHash(fileData);

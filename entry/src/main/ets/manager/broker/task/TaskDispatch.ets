@@ -106,7 +106,7 @@ class TaskDispatch{
   /**
    * 发送被调度的任务到目标设备
    * - 小文件（≤ fileSizeThreshold）：直接通过 MQTT 发送任务信息
-   * - 大文件（> fileSizeThreshold）：将文件数据委托给 FileTransferManager，
+   * - 大文件（> fileSizeThreshold）：显式指定 TCP 协议，委托给 FileTransferManager，
    *   FileTransferManager 启动 TCP 服务器后通过 notifyCallback 通知目标设备发起连接
    * @param taskInfo - 待发送的完整任务传输数据
    * @returns 发送是否成功
@@ -118,8 +118,8 @@ class TaskDispatch{
       console.info(`[TaskDispatch] 估算数据大小：dataSize=${dataSize}`);
 
       if (dataSize > this.fileSizeThreshold) {
-        // 大文件：委托 FileTransferManager 选择 TCP 协议并传输
-        console.info(`[TaskDispatch] 大文件传输，委托给 FileTransferManager，taskId=${taskInfo.taskId}`);
+        // 大文件：显式指定 TCP 协议，委托 FileTransferManager 处理
+        console.info(`[TaskDispatch] 大文件传输，显式指定 TCP 协议，taskId=${taskInfo.taskId}`);
 
         // 将任务数据转换为传输用的 ArrayBuffer
         const fileData = this.extractFileData(taskInfo.params);
@@ -135,7 +135,7 @@ class TaskDispatch{
           size: dataSize
         };
 
-        // 调用 FileTransferManager，并传入 notifyCallback
+        // 调用 FileTransferManager 并传入 notifyCallback
         // 当 TCP 服务器就绪后，FileTransferManager 会调用此回调，
         // TaskDispatch 将通过 MQTT 通知目标设备发起 TCP 连接
         const notifyCallback: TCPNotifyCallback = async (notifyInfo: TCPNotifyInfo): Promise<void> => {
@@ -153,6 +153,7 @@ class TaskDispatch{
           fileData,
           fileInfo,
           taskInfo.toClient,
+          'TCP',
           notifyCallback
         );
         return true;
@@ -204,7 +205,7 @@ class TaskDispatch{
   }
 
   /**
-   * 解析接收到的任务消息并处理
+   * 解析接收到的任务消息并处理 TODO接收文件扩展
    * - 直接传输（direct）：直接执行本地推理
    * - TCP 大文件传输（tcp）：委托 FileTransferManager 建立连接并接收文件，再执行推理
    * @param message - 接收到的任务消息 JSON 字符串

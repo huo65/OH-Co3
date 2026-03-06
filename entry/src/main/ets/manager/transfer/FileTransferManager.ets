@@ -1,20 +1,20 @@
 /**
  * 文件传输管理器
- * 统一管理所有文件传输任务，自动选择传输协议，提供完整的传输管理功能
+ * 统一管理所有文件传输任务，由调用方显式指定传输协议，提供完整的传输管理功能
  */
 import { TransferProtocolInterface, TransferState, TransferProgress, TransferConfig } from './protocol/TransferProtocolInterface';
 import { ProtocolRegistry } from './protocol/ProtocolRegistry';
 import { MQTTTransferProtocol } from './protocol/MQTTTransferProtocol';
 import { TCPTransferProtocol } from './protocol/TCPTransferProtocol';
-import { FileInfo, TransferTask, TransferOptions, TCPNotifyInfo } from './model/TransferDataModels';
+import { FileInfo, TransferTask, TransferOptions, TCPNotifyCallback } from './model/TransferDataModels';
 import { NetworkUtils } from './utils/NetworkUtils';
 import { TransferEventManager } from './event/TransferEvents';
 
 /**
- * TCP 传输通知回调类型
- * 当 FileTransferManager 选择 TCP 协议时，通过此回调通知调用方向目标设备发送连接信息
+ * TCP 传输通知回调类型——重新导出以保持向后兼容
+ * 实际定义在 TransferDataModels.ets 中
  */
-export type TCPNotifyCallback = (notifyInfo: TCPNotifyInfo) => Promise<void>;
+export { TCPNotifyCallback };
 
 /**
  * 文件传输管理器类
@@ -103,24 +103,26 @@ export class FileTransferManager {
 
   /**
    * 发起文件传输
-   * 自动选择协议：小文件（≤sizeThreshold）使用 MQTT，大文件使用 TCP
+   * 调用方通过 protocolName 显式指定协议，如需 TCP 服务器模式传输，可将 notifyCallback 嵌入 config 传入
+   * 协议内部自行处理传输全流程，FileTransferManager 层无需感知具体协议实现细节
    * @param fileData - 文件数据
    * @param fileInfo - 文件信息
    * @param targetDevice - 目标设备标识
-   * @param notifyCallback - TCP 大文件传输时的通知回调，由调用方实现通过 MQTT 通知目标设备发起 TCP 连接
+   * @param protocolName - 指定使用的传输协议名称（需已在 ProtocolRegistry 中注册）
+   * @param notifyCallback - TCP 服务器就绪后的通知回调，用于通知目标设备发起连接（如不使用 TCP 可不传）
    * @returns 任务 ID
    */
   async transferFile(
     fileData: ArrayBuffer | string,
     fileInfo: FileInfo,
     targetDevice: string,
+    protocolName: string,
     notifyCallback?: TCPNotifyCallback
   ): Promise<string> {
     // 优先复用调用方传入的业务 taskId（fileInfo.fileId），避免重复生成导致追踪不一致
     const taskId = fileInfo.fileId && fileInfo.fileId.length > 0
       ? fileInfo.fileId
       : `task_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-    const protocolName = this.selectProtocol(fileInfo.size);
     console.info(`[FileTransferManager] 任务 ${taskId} 使用协议：${protocolName}`);
 
     const task: TransferTask = {
@@ -147,18 +149,15 @@ export class FileTransferManager {
 
     let success = false;
     try {
-      if (protocolName === 'TCP') {
-        success = await this.transferViaTCP(
-          protocol as TCPTransferProtocol,
-          fileData,
-          taskId,
-          fileInfo,
-          notifyCallback
-        );
-      } else {
-        // MQTT 传输：直接发送原始数据
-        success = await protocol.send(fileData, taskId);
-      }
+      // 将 notifyCallback 嵌入 config 传入协议，协议内部自行决定是否使用
+      // 不同协议只调用同一个 send 方法，无条件分支
+      const sendConfig: TransferConfig = {
+        chunkSize: this.defaultOptions.tcpChunkSize,
+        maxRetries: this.defaultOptions.maxRetries,
+        timeout: this.defaultOptions.timeout,
+        notifyCallback
+      };
+      success = await protocol.send(fileData, taskId, sendConfig);
     } catch (error) {
       const errMsg: string = error instanceof Error ? error.message : String(error);
       task.state = 'failed';
@@ -267,82 +266,6 @@ export class FileTransferManager {
       console.error('[FileTransferManager] 文件接收失败:', errMsg);
       throw new Error(errMsg);
     }
-  }
-
-  /**
-   * 通过 TCP 协议传输文件（发送端）
-   * 流程：启动服务器 → 触发 notifyCallback 通知目标设备 → 等待连接 → 发送数据
-   * @param protocol - TCP 协议实例
-   * @param fileData - 文件数据
-   * @param taskId - 任务 ID
-   * @param fileInfo - 文件元数据
-   * @param notifyCallback - 通知目标设备发起 TCP 连接的回调（由调用方实现）
-   */
-  private async transferViaTCP(
-    protocol: TCPTransferProtocol,
-    fileData: ArrayBuffer | string,
-    taskId: string,
-    fileInfo: FileInfo,
-    notifyCallback?: TCPNotifyCallback
-  ): Promise<boolean> {
-    try {
-      const localIp = NetworkUtils.getIpAddress();
-      const port = this.defaultOptions.tcpPort!;
-
-      // 启动 TCP 服务器监听（等待目标设备连接）
-      if (!protocol.isConnected()) {
-        const serverStarted = await protocol.startServer(port);
-        if (!serverStarted) {
-          throw new Error(`TCP 服务器启动失败，端口=${port}`);
-        }
-        console.info(`[FileTransferManager] TCP 服务器已启动，监听 ${localIp}:${port}`);
-      }
-
-      // 通过回调通知目标设备：请主动连接到 localIp:port 发起 TCP 传输
-      if (notifyCallback) {
-        const notifyInfo: TCPNotifyInfo = {
-          taskId,
-          sourceIp: localIp,
-          port,
-          fileInfo
-          // fileHash 将在发送过程中由 TCPTransferProtocol 内部计算填充
-        };
-        await notifyCallback(notifyInfo);
-        console.info(`[FileTransferManager] 已通知目标设备发起 TCP 连接，taskId=${taskId}`);
-      } else {
-        console.warn(`[FileTransferManager] 未提供 notifyCallback，目标设备可能无法得知需要发起 TCP 连接`);
-      }
-
-      // 发送文件数据（等待目标设备连接后发送）
-      const config: TransferConfig = {
-        chunkSize: this.defaultOptions.tcpChunkSize,
-        maxRetries: this.defaultOptions.maxRetries,
-        timeout: this.defaultOptions.timeout
-      };
-
-      return await protocol.send(fileData, taskId, config);
-    } catch (error) {
-      console.error('[FileTransferManager] TCP 传输失败:', error);
-      return false;
-    }
-  }
-
-  /**
-   * 选择传输协议
-   * @param fileSize - 文件大小（字节）
-   * @returns 协议名称
-   */
-  private selectProtocol(fileSize: number): string {
-    // const threshold = this.defaultOptions.sizeThreshold!;TODO MQTT协议统一
-    //
-    // if (fileSize > threshold) {
-    //   console.info(`[FileTransferManager] 文件大小 ${fileSize} 字节 > ${threshold} 字节，使用 TCP 协议`);
-    //   return 'TCP';
-    // } else {
-    //   console.info(`[FileTransferManager] 文件大小 ${fileSize} 字节 <= ${threshold} 字节，使用 MQTT协议`);
-    //   return 'MQTT';
-    // }
-    return 'TCP';
   }
 
   /**

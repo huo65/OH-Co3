@@ -7,7 +7,7 @@
 import { FileTransferManager, FileInfo, FileUtils } from '../index';
 
 /**
- * 示例 1: 基本文件传输（自动选择协议）
+ * 示例 1: 基本文件传输（显式指定 MQTT 协议）
  */
 async function example1_BasicTransfer() {
   // 获取文件传输管理器实例
@@ -22,13 +22,13 @@ async function example1_BasicTransfer() {
     fileType: 'image/jpeg'
   };
   
-  // 发起传输（小于 2MB 会自动使用 MQTT协议）
-  const taskId = await transferManager.transferFile(fileData, fileInfo, 'target_device_1');
+  // 发起传输（显式指定使用 MQTT 协议）
+  const taskId = await transferManager.transferFile(fileData, fileInfo, 'target_device_1', 'MQTT');
   console.info(`传输任务已创建，taskId=${taskId}`);
 }
 
 /**
- * 示例 2: 大文件传输（自动使用 TCP 协议）
+ * 示例 2: 大文件传输（显式指定 TCP 协议）
  */
 async function example2_LargeFileTransfer() {
   const transferManager = FileTransferManager.getInstance();
@@ -42,8 +42,8 @@ async function example2_LargeFileTransfer() {
     fileType: 'application/octet-stream'
   };
   
-  // 发起传输（大于 2MB 会自动使用 TCP 协议）
-  const taskId = await transferManager.transferFile(largeFileData, fileInfo, 'target_device_2');
+  // 发起传输（显式指定 TCP 协议）
+  const taskId = await transferManager.transferFile(largeFileData, fileInfo, 'target_device_2', 'TCP');
   console.info(`大文件传输任务已创建，taskId=${taskId}, 使用 TCP 协议`);
 }
 
@@ -165,8 +165,8 @@ async function example10_CompleteFlow() {
       fileType: 'application/octet-stream'
     };
     
-    // 2. 发起传输
-    const taskId = await transferManager.transferFile(fileData, fileInfo, 'device_A');
+    // 2. 发起传输（显式指定 TCP 协议）
+    const taskId = await transferManager.transferFile(fileData, fileInfo, 'device_A', 'TCP');
     console.info(`传输开始，taskId=${taskId}`);
     
     // 3. 等待并检查进度
