@@ -330,15 +330,16 @@ export class FileTransferManager {
    * @returns 协议名称
    */
   private selectProtocol(fileSize: number): string {
-    const threshold = this.defaultOptions.sizeThreshold!;
-    
-    if (fileSize > threshold) {
-      console.info(`[FileTransferManager] 文件大小 ${fileSize} 字节 > ${threshold} 字节，使用 TCP 协议`);
-      return 'TCP';
-    } else {
-      console.info(`[FileTransferManager] 文件大小 ${fileSize} 字节 <= ${threshold} 字节，使用 MQTT协议`);
-      return 'MQTT';
-    }
+    // const threshold = this.defaultOptions.sizeThreshold!;TODO MQTT协议统一
+    //
+    // if (fileSize > threshold) {
+    //   console.info(`[FileTransferManager] 文件大小 ${fileSize} 字节 > ${threshold} 字节，使用 TCP 协议`);
+    //   return 'TCP';
+    // } else {
+    //   console.info(`[FileTransferManager] 文件大小 ${fileSize} 字节 <= ${threshold} 字节，使用 MQTT协议`);
+    //   return 'MQTT';
+    // }
+    return 'TCP';
   }
 
   /**

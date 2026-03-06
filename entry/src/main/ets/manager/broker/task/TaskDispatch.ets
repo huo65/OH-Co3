@@ -99,8 +99,8 @@ class TaskResTransmitData {
 class TaskDispatch{
   // 文件大小阈値，从 FileTransferManager 默认配置读取
   private get fileSizeThreshold(): number {
-    // 与 FileTransferManager 内部配置保持一致：2MB
-    return 2 * 1024 * 1024;
+    // 与 FileTransferManager 内部配置保持一致：2kb
+    return 2 * 1024;
   }
 
   /**
