@@ -4,7 +4,7 @@ import { InferenceInputType, InferenceWorker } from '../manager/worker/Inference
 import { SelectTitleBar } from '@kit.ArkUI';
 import { ModelManager } from '../TestImageTask/ImageIdModelManager';
 import deviceInfo from '@ohos.deviceInfo';
-
+import image from '@ohos.multimedia.image';
 
 // @Entry
 @Component
@@ -16,10 +16,10 @@ export struct TestClientPage {
   @State testResult: string = '';
   @State logMessages: string[] = [];
   @State systemStatus: SystemStatus | null = null;
-
+  // TODO 改进测试页面
   // MQTT配置
   private mqttConfig: MQTTConfig = {
-    url: 'mqtt://10.218.227.159:1883',
+    url: 'mqtt://10.158.126.159:1883',
     //测试防止重复 clientId: deviceInfo.marketName + "_" + Math.floor(Math.random() * 10000),
     clientId: deviceInfo.marketName,
     userName: 'root',
@@ -147,5 +147,16 @@ export struct TestClientPage {
     if (this.logMessages.length > 20) {
       this.logMessages.shift();
     }
+  }
+  private async getBigFile(): Promise<Uint8Array>{
+    const resMgr = getContext().getApplicationContext().resourceManager;
+    try {
+      const rawFileContent: Uint8Array = await resMgr.getRawFileContent("mobilenetv2.ms");
+      return rawFileContent;
+    } catch (error) {
+      // TODO: Implement error handling.
+      console.info(`[TestPage] 测试页面 error=${error}`);
+    }
+    return new Uint8Array;
   }
 }

@@ -184,7 +184,7 @@ class HarmonyInferenceClient {
       // 初始化全局任务队列
       GlobalTaskManager.init(this.worker);
 
-      // 启动设备状态同步
+      // 启动设备状态同步 TODO 停止同步
       this.startDeviceStatusSync();
 
       this.isInitialized = true;
