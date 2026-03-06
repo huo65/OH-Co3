@@ -4,9 +4,9 @@ import { InferenceResult, InferenceInputType, ImageInputData } from '../../worke
 import { ownName } from '../monitor/NodeInfoSyn';
 import { MQTTClient } from '../MQTTClient'
 import { systemDateTime } from '@kit.BasicServicesKit';
-import { NetworkUtils } from '../../transfer/utils/NetworkUtils';
+import { FileTransferManager, TCPNotifyCallback } from '../../transfer/FileTransferManager';
 import { FileUtils } from '../../transfer/utils/FileUtils';
-import { TCPTransferProtocol } from '../../transfer/protocol/TCPTransferProtocol';
+import { FileInfo, TCPNotifyInfo } from '../../transfer/model/TransferDataModels';
 
 
 /**
@@ -94,76 +94,96 @@ class TaskResTransmitData {
 /**
  * 任务调度分发类
  * 负责推理任务在分布式设备间的发送、接收、解析与结果回传
+ * 具体的文件传输协议选择与 TCP 连接建立均委托给 FileTransferManager
  */
 class TaskDispatch{
-  // 文件大小阈值，超过此值使用 TCP 传输（2MB）
-  private readonly FILE_SIZE_THRESHOLD: number = 2 * 1024 * 1024;
+  // 文件大小阈値，从 FileTransferManager 默认配置读取
+  private get fileSizeThreshold(): number {
+    // 与 FileTransferManager 内部配置保持一致：2MB
+    return 2 * 1024 * 1024;
+  }
 
   /**
    * 发送被调度的任务到目标设备
+   * - 小文件（≤ fileSizeThreshold）：直接通过 MQTT 发送任务信息
+   * - 大文件（> fileSizeThreshold）：将文件数据委托给 FileTransferManager，
+   *   FileTransferManager 启动 TCP 服务器后通过 notifyCallback 通知目标设备发起连接
    * @param taskInfo - 待发送的完整任务传输数据
    * @returns 发送是否成功
    */
   async sendTask(taskInfo: TaskTransmitData): Promise<boolean> {
-    const MQTTInstance: MQTTClient = MQTTClient.getInstance()
+    const MQTTInstance: MQTTClient = MQTTClient.getInstance();
     try {
-      // 判断是否需要使用 TCP 传输大文件
       const dataSize = this.estimateDataSize(taskInfo.params);
-      console.info(`[TaskDispatch] 文件大小，dataSize=${dataSize}`);
+      console.info(`[TaskDispatch] 估算数据大小：dataSize=${dataSize}`);
 
-      // TODO 测试完调整
-      if (dataSize < this.FILE_SIZE_THRESHOLD) {
-        // 大文件，使用 TCP 传输
-        return await this.sendLargeFile(taskInfo);
+      if (dataSize > this.fileSizeThreshold) {
+        // 大文件：委托 FileTransferManager 选择 TCP 协议并传输
+        console.info(`[TaskDispatch] 大文件传输，委托给 FileTransferManager，taskId=${taskInfo.taskId}`);
+
+        // 将任务数据转换为传输用的 ArrayBuffer
+        const fileData = this.extractFileData(taskInfo.params);
+        if (!fileData) {
+          console.error('[TaskDispatch] 无法提取文件数据');
+          return false;
+        }
+
+        // 构建文件元数据
+        const fileInfo: FileInfo = {
+          fileId: taskInfo.taskId,
+          fileName: taskInfo.taskId,
+          size: dataSize
+        };
+
+        // 调用 FileTransferManager，并传入 notifyCallback
+        // 当 TCP 服务器就绪后，FileTransferManager 会调用此回调，
+        // TaskDispatch 将通过 MQTT 通知目标设备发起 TCP 连接
+        const notifyCallback: TCPNotifyCallback = async (notifyInfo: TCPNotifyInfo): Promise<void> => {
+          taskInfo.transferType = 'tcp';
+          taskInfo.sourceIp = notifyInfo.sourceIp;
+          if (notifyInfo.fileHash !== undefined) {
+            taskInfo.fileHash = notifyInfo.fileHash;
+          }
+          const taskInfoMessage = JSON.stringify(taskInfo);
+          await MQTTInstance.pushMessage(taskInfoMessage, '/task/assign');
+          console.info(`[TaskDispatch] 已通过 MQTT 通知目标设备发起 TCP 连接，sourceIp=${notifyInfo.sourceIp}`);
+        };
+
+        await FileTransferManager.getInstance().transferFile(
+          fileData,
+          fileInfo,
+          taskInfo.toClient,
+          notifyCallback
+        );
+        return true;
       } else {
-        // 小文件，使用 MQTT 直接传输
+        // 小文件：直接通过 MQTT 发送任务消息
+        taskInfo.transferType = 'direct';
         const taskInfoMessage = JSON.stringify(taskInfo);
-        MQTTInstance.pushMessage(taskInfoMessage,"/task/assign");
+        MQTTInstance.pushMessage(taskInfoMessage, '/task/assign');
         return true;
       }
     } catch (e) {
-      console.error(e);
+      console.error('[TaskDispatch] sendTask 异常:', e);
       return false;
     }
   }
 
   /**
-   * 发送大文件（通过 TCP 协议）TODO 应该由manger接管
-   * @param taskInfo - 任务信息
-   * @returns 发送是否成功
+   * 从推理任务中提取文件数据
+   * @param task - 推理任务
+   * @returns 文件的 ArrayBuffer 表示，如果无法提取则返回 null
    */
-  private async sendLargeFile(taskInfo: TaskTransmitData): Promise<boolean> {
-    try {
-      // 获取本机 IP 地址
-      const sourceIp = NetworkUtils.getIpAddress();
-      if (!sourceIp) {
-        console.error('[TaskDispatch] 无法获取本机 IP 地址');
-        return false;
+  private extractFileData(task: InferenceTask): ArrayBuffer | null {
+    if (task.type === InferenceInputType.IMAGE) {
+      const imageDataObj: ImageInputData = task.data as ImageInputData;
+      const base64: string = imageDataObj.imageData || '';
+      if (!base64) {
+        return null;
       }
-      
-      // 设置 TCP 传输标识和源 IP
-      taskInfo.transferType = 'tcp';
-      taskInfo.sourceIp = sourceIp;
-      
-      console.info(`[TaskDispatch] 大文件传输，taskId=${taskInfo.taskId}, sourceIp=${sourceIp}`);
-      
-      // TODO: 启动 TCP 服务器监听
-      const tcpProtocol = new TCPTransferProtocol();
-      await tcpProtocol.startServer(8888);
-      
-      // 通过 MQTT 发送任务通知（包含 TCP 连接信息）
-      const taskInfoMessage = JSON.stringify(taskInfo);
-      const MQTTInstance: MQTTClient = MQTTClient.getInstance();
-      await MQTTInstance.pushMessage(taskInfoMessage, "/task/assign");
-      
-      // TODO: 等待目标设备发起 TCP 连接并传输文件
-      // 目标设备收到消息后会主动连接到 sourceIp:8888
-      
-      return true;
-    } catch (error) {
-      console.error('[TaskDispatch] 大文件传输失败:', error);
-      return false;
+      return FileUtils.base64ToArrayBuffer(base64);
     }
+    return null;
   }
 
   /**
@@ -185,62 +205,35 @@ class TaskDispatch{
 
   /**
    * 解析接收到的任务消息并处理
+   * - 直接传输（direct）：直接执行本地推理
+   * - TCP 大文件传输（tcp）：委托 FileTransferManager 建立连接并接收文件，再执行推理
    * @param message - 接收到的任务消息 JSON 字符串
    */
   async parseTaskMessage(message: string) {
-    const taskInfo: TaskTransmitData = JSON.parse(message)
+    const taskInfo: TaskTransmitData = JSON.parse(message);
     console.info('收到任务消息', taskInfo.taskId);
 
-    if (taskInfo.toClient == ownName) {
-      // 判断是否是 TCP 大文件传输
-      if (taskInfo.transferType === 'tcp' && taskInfo.sourceIp) {
-        console.info('收到 TCP 大文件传输任务，准备发起 TCP 连接');
-        await this.receiveLargeFile(taskInfo);
-        return;
-      } else {
-        // 本地执行推理，添加到全局任务队列
-        console.info('收到分配任务');
-        const taskQueue = GlobalTaskManager.getQueue()
-        const result = await taskQueue.addTask(taskInfo.params);
-        const taskResTransmitData: TaskResTransmitData = new TaskResTransmitData()
-        taskResTransmitData.taskId = taskInfo.taskId;
-        taskResTransmitData.fromClient = taskInfo.fromClient;
-        taskResTransmitData.toClient = taskInfo.toClient;
-        taskResTransmitData.params = result;
-        taskResTransmitData.timestamp = systemDateTime.getTime(false);
-        this.sendTaskResult(taskResTransmitData)
-      }
-
+    if (taskInfo.toClient !== ownName) {
+      return;
     }
-  }
-  
-  /**
-   * 接收大文件（通过 TCP 协议）
-   * @param taskInfo - 任务信息
-   */
-  private async receiveLargeFile(taskInfo: TaskTransmitData): Promise<void> {
-    try {
-      console.info(`[TaskDispatch] 开始接收大文件，taskId=${taskInfo.taskId}, sourceIp=${taskInfo.sourceIp}`);
-        
-      // TODO: 发起 TCP 连接到源设备
-      const tcpProtocol = new TCPTransferProtocol();
-      const connected = await tcpProtocol.connect(taskInfo.sourceIp!, 8888);
-        
-      if (connected) {
-        // 接收文件数据
-        const fileData  = await tcpProtocol.receive(taskInfo.taskId);
 
-        // 验证文件哈希
-        if (taskInfo.fileHash) {
-          const isValid = await FileUtils.verifyHash(fileData as ArrayBuffer, taskInfo.fileHash);
-          if (!isValid) {
-            console.error('[TaskDispatch] 文件哈希校验失败');
-            return;
-          }
-        }
+    if (taskInfo.transferType === 'tcp' && taskInfo.sourceIp) {
+      // 大文件 TCP 传输：委托 FileTransferManager 接收文件
+      console.info('收到 TCP 大文件传输任务，委托 FileTransferManager 建立连接并接收');
+      try {
+        const fileInfo: FileInfo= {
+          fileId: taskInfo.taskId,
+          fileName: taskInfo.taskId,
+          size: 0,
+          hash: taskInfo.fileHash
+        };
+        const fileData = await FileTransferManager.getInstance().receiveFile(
+          taskInfo.taskId,
+          taskInfo.sourceIp,
+          fileInfo
+        );
 
-        // 将文件数据设置到任务参数中
-        // 注意：这里需要根据实际的 InferenceTask 结构调整
+        // 将接收到的文件数据还原到任务参数
         if (taskInfo.params.type === InferenceInputType.IMAGE) {
           const imageDataObj: ImageInputData = {
             imageData: FileUtils.arrayBufferToBase64(fileData as ArrayBuffer)
@@ -248,26 +241,34 @@ class TaskDispatch{
           taskInfo.params.data = imageDataObj;
         }
 
-        // 执行本地推理
-        const taskQueue = GlobalTaskManager.getQueue();
-        const result = await taskQueue.addTask(taskInfo.params);
-
-        // 返回结果
-        const taskResTransmitData = new TaskResTransmitData();
-        taskResTransmitData.taskId = taskInfo.taskId;
-        taskResTransmitData.fromClient = taskInfo.fromClient;
-        taskResTransmitData.toClient = taskInfo.toClient;
-        taskResTransmitData.params = result;
-        taskResTransmitData.timestamp = systemDateTime.getTime(false);
-        this.sendTaskResult(taskResTransmitData);
+        // 执行推理并返回结果
+        await this.executeAndReturn(taskInfo);
+      } catch (error) {
+        console.error('[TaskDispatch] TCP 文件接收失败:', error);
       }
-        
-      console.info('[TaskDispatch] TCP 文件接收逻辑待实现');
-    } catch (error) {
-      console.error('[TaskDispatch] TCP 文件接收失败:', error);
+    } else {
+      // 直接传输：执行本地推理并返回结果
+      console.info('收到分配任务');
+      await this.executeAndReturn(taskInfo);
     }
   }
 
+  /**
+   * 执行本地推理并返回结果
+   * @param taskInfo - 包含推理参数的任务信息
+   */
+  private async executeAndReturn(taskInfo: TaskTransmitData): Promise<void> {
+    const taskQueue = GlobalTaskManager.getQueue();
+    const result = await taskQueue.addTask(taskInfo.params);
+    const taskResTransmitData: TaskResTransmitData = new TaskResTransmitData();
+    taskResTransmitData.taskId = taskInfo.taskId;
+    taskResTransmitData.fromClient = taskInfo.fromClient;
+    taskResTransmitData.toClient = taskInfo.toClient;
+    taskResTransmitData.params = result;
+    taskResTransmitData.timestamp = systemDateTime.getTime(false);
+    this.sendTaskResult(taskResTransmitData);
+  }
+  
   /**
    * 发送任务执行结果到请求方
    * @param inferenceResult - 封装好的任务结果传输数据

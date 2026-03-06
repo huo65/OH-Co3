@@ -96,6 +96,23 @@ export interface TCPHandshakeMessage {
 }
 
 /**
+ * TCP 传输通知信息
+ * 发送端启动 TCP 服务器后，将此信息通过 MQTT 通知目标设备发起连接
+ */
+export interface TCPNotifyInfo {
+  /** 任务 ID */
+  taskId: string;
+  /** 源设备 IP 地址 */
+  sourceIp: string;
+  /** TCP 监听端口 */
+  port: number;
+  /** 文件元数据 */
+  fileInfo: FileInfo;
+  /** 文件哈希值（用于校验） */
+  fileHash?: string;
+}
+
+/**
  * 传输配置选项
  */
 export interface TransferOptions {
