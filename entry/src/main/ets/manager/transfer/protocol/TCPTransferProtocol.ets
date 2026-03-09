@@ -145,6 +145,7 @@ export class TCPTransferProtocol implements TransferProtocolInterface {
       }
 
       // 服务器就绪，通知目标设备发起连接
+      // TODO 1. 文件hash加入信息 2. TCP这个类型
       if (config?.notifyCallback) {
         const notifyInfo: TCPNotifyInfo = {
           taskId,
@@ -298,7 +299,7 @@ export class TCPTransferProtocol implements TransferProtocolInterface {
    * 发送握手消息
    */
   private async sendHandshake(taskId: string, handshakeInfo: TCPSendHandshakeInfo): Promise<boolean> {
-    // TODO: 实现握手消息发送
+    // TODO: 实现握手消息发送（放在mqtt初始消息里
     console.info(`[TCPTransferProtocol] 发送握手消息，taskId=${taskId}, fileName=${handshakeInfo.fileName}`);
     return true;
   }
@@ -330,7 +331,7 @@ export class TCPTransferProtocol implements TransferProtocolInterface {
    * 等待所有分块接收完成
    */
   private async waitForAllChunks(taskId: string): Promise<ChunkData[]> {
-    // TODO: 需要实现异步等待逻辑
+    // TODO: ！！！需要实现异步等待逻辑
     // 这里简化返回缓存的分块
     return this.chunkBuffers.get(taskId) || [];
   }

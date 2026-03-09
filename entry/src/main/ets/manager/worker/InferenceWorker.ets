@@ -6,7 +6,7 @@ export interface InferenceTask {
 
   // 推理输入字段
   type: InferenceInputType;
-  data: ImageInputData | TextInputData | AudioInputData | ArrayBuffer;
+  data: ImageInputData | TextInputData | AudioInputData | ArrayBuffer | '';
   params?: Record<string, string | number | boolean | ArrayBuffer>;
 
 }

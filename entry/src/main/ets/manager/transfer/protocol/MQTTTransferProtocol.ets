@@ -6,7 +6,7 @@ import { TransferProtocolInterface, TransferConfig, TransferState, TransferProgr
 import { MQTTClient } from '../../broker/MQTTClient';
 import { FileInfo } from '../model/TransferDataModels';
 import { FileUtils } from '../utils/FileUtils';
-
+// TODO 使用类似TCP的思想，开一个单独的主题
 export class MQTTTransferProtocol implements TransferProtocolInterface {
   private mqttClient: MQTTClient;
   private progressMap: Map<string, TransferProgress> = new Map();

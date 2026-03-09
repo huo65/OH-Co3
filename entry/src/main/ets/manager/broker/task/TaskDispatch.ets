@@ -94,7 +94,6 @@ class TaskResTransmitData {
 /**
  * 任务调度分发类
  * 负责推理任务在分布式设备间的发送、接收、解析与结果回传
- * 具体的文件传输协议选择与 TCP 连接建立均委托给 FileTransferManager
  */
 class TaskDispatch{
   // 文件大小阈値，从 FileTransferManager 默认配置读取
@@ -111,6 +110,7 @@ class TaskDispatch{
    * @param taskInfo - 待发送的完整任务传输数据
    * @returns 发送是否成功
    */
+  // TODO 目前先基于TCP调通，后续扩展纯接口实现
   async sendTask(taskInfo: TaskTransmitData): Promise<boolean> {
     const MQTTInstance: MQTTClient = MQTTClient.getInstance();
     try {
@@ -140,6 +140,7 @@ class TaskDispatch{
         // TaskDispatch 将通过 MQTT 通知目标设备发起 TCP 连接
         const notifyCallback: TCPNotifyCallback = async (notifyInfo: TCPNotifyInfo): Promise<void> => {
           taskInfo.transferType = 'tcp';
+          taskInfo.params.data = ''
           taskInfo.sourceIp = notifyInfo.sourceIp;
           if (notifyInfo.fileHash !== undefined) {
             taskInfo.fileHash = notifyInfo.fileHash;
@@ -200,7 +201,7 @@ class TaskDispatch{
       const imageData: string = imageDataObj.imageData || '';
       return imageData.length;
     }
-    // 其他类型可以进一步扩展
+    // TODO其他类型可以进一步扩展
     return 0;
   }
 
@@ -233,6 +234,7 @@ class TaskDispatch{
           taskInfo.sourceIp,
           fileInfo
         );
+        // TODO 注销TCP
 
         // 将接收到的文件数据还原到任务参数
         if (taskInfo.params.type === InferenceInputType.IMAGE) {
