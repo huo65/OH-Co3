@@ -6,7 +6,8 @@ import { MQTTClient } from '../MQTTClient'
 import { systemDateTime } from '@kit.BasicServicesKit';
 import { FileTransferManager, TCPNotifyCallback } from '../../transfer/FileTransferManager';
 import { FileUtils } from '../../transfer/utils/FileUtils';
-import { FileInfo, TCPNotifyInfo } from '../../transfer/model/TransferDataModels';
+import { FileInfo } from '../../transfer/model/TransferDataModels';
+import { TCPNotifyInfo } from '../../transfer/model/TCPModels';
 
 
 /**

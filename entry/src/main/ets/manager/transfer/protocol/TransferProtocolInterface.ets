@@ -1,8 +1,7 @@
 /**
  * 传输协议接口定义
- * 为所有文件传输协议提供标准化的接口抄象
+ * 为所有文件传输协议提供标准化的接口抽象
  */
-import { TCPNotifyCallback } from '../model/TransferDataModels';
 
 /**
  * 传输状态枚举
@@ -33,12 +32,6 @@ export interface TransferConfig {
   maxRetries?: number;
   /** 分块大小（字节），用于大文件分块传输 */
   chunkSize?: number;
-  /**
-   * TCP 服务器就绪后的通知回调（仅 TCP 协议使用）
-   * 由 TCPTransferProtocol.send 在服务器启动后调用，调用方需实现此回调以通知目标设备发起连接
-   */
-  // TODO 不够优雅
-  notifyCallback?: TCPNotifyCallback;
 }
 
 /**

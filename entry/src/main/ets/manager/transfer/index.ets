@@ -25,9 +25,15 @@ export {
   FileInfo,
   ChunkData,
   TransferTask,
-  TCPHandshakeMessage,
   TransferOptions
 } from './model/TransferDataModels';
+
+// TCP 专用数据模型
+export {
+  TCPNotifyInfo,
+  TCPNotifyCallback,
+  TCPTransferConfig
+} from './model/TCPModels';
 
 // 工具类
 export { FileUtils } from './utils/FileUtils';

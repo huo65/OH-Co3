@@ -79,46 +79,6 @@ export interface TransferTask {
 }
 
 /**
- * TCP 握手消息
- * 用于 TCP 连接建立时的握手通信
- */
-export interface TCPHandshakeMessage {
-  /** 消息类型 */
-  type: 'handshake' | 'start_transfer' | 'chunk' | 'complete' | 'error';
-  /** 任务 ID */
-  taskId: string;
-  /** 文件信息 */
-  fileInfo?: FileInfo;
-  /** 分块信息（仅在 chunk 类型时有效） */
-  chunkData?: ChunkData;
-  /** 错误信息（仅在 error 类型时有效） */
-  errorMessage?: string;
-}
-
-/**
- * TCP 传输通知信息
- * 发送端启动 TCP 服务器后，将此信息通过 MQTT 通知目标设备发起连接
- */
-export interface TCPNotifyInfo {
-  /** 任务 ID */
-  taskId: string;
-  /** 源设备 IP 地址 */
-  sourceIp: string;
-  /** TCP 监听端口 */
-  port: number;
-  /** 文件元数据 */
-  fileInfo: FileInfo;
-  /** 文件哈希值（用于校验） */
-  fileHash?: string;
-}
-
-/**
- * TCP 传输通知回调类型
- * TCP 服务器就绪后调用，用于通知目标设备发起连接
- */
-export type TCPNotifyCallback = (notifyInfo: TCPNotifyInfo) => Promise<void>;
-
-/**
  * 传输配置选项
  */
 export interface TransferOptions {

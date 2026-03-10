@@ -6,13 +6,14 @@ import { TransferProtocolInterface, TransferState, TransferProgress, TransferCon
 import { ProtocolRegistry } from './protocol/ProtocolRegistry';
 import { MQTTTransferProtocol } from './protocol/MQTTTransferProtocol';
 import { TCPTransferProtocol } from './protocol/TCPTransferProtocol';
-import { FileInfo, TransferTask, TransferOptions, TCPNotifyCallback } from './model/TransferDataModels';
+import { FileInfo, TransferTask, TransferOptions } from './model/TransferDataModels';
+import { TCPNotifyCallback, TCPTransferConfig } from './model/TCPModels';
 import { NetworkUtils } from './utils/NetworkUtils';
 import { TransferEventManager } from './event/TransferEvents';
 
 /**
  * TCP 传输通知回调类型——重新导出以保持向后兼容
- * 实际定义在 TransferDataModels.ets 中
+ * 实际定义在 TCPModels.ets 中
  */
 export { TCPNotifyCallback };
 
@@ -149,9 +150,10 @@ export class FileTransferManager {
 
     let success = false;
     try {
-      // 将 notifyCallback 嵌入 config 传入协议，协议内部自行决定是否使用
-      // 不同协议只调用同一个 send 方法，无条件分支
-      const sendConfig: TransferConfig = {
+      // 构造传输配置
+      // 对于 TCP 协议，notifyCallback 用于通知目标设备发起连接
+      // 对于 MQTT 协议，notifyCallback 会被忽略
+      const sendConfig: TCPTransferConfig = {
         chunkSize: this.defaultOptions.tcpChunkSize,
         maxRetries: this.defaultOptions.maxRetries,
         timeout: this.defaultOptions.timeout,

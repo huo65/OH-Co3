@@ -66,8 +66,9 @@ export class MQTTTransferProtocol implements TransferProtocolInterface {
    * 发送文件数据
    * @param data - 文件数据（ArrayBuffer 或 Base64 编码的字符串）
    * @param taskId - 任务 ID
+   * @param config - 传输配置（MQTT 协议不使用 notifyCallback）
    */
-  async send(data: ArrayBuffer | string, taskId: string): Promise<boolean> {
+  async send(data: ArrayBuffer | string, taskId: string, config?: TransferConfig): Promise<boolean> {
     const timeout = this.DEFAULT_TIMEOUT;
     
     for (let attempt = 0; attempt < this.MAX_RETRIES; attempt++) {

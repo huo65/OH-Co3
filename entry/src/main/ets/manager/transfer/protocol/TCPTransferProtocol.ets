@@ -4,7 +4,8 @@
  */
 import { TransferProtocolInterface, TransferConfig, TransferState, TransferProgress } from '../protocol/TransferProtocolInterface';
 import { FileTransferSocketManager } from '../socket/FileTransferSocketManager';
-import { ChunkData, TCPNotifyInfo } from '../model/TransferDataModels';
+import { ChunkData } from '../model/TransferDataModels';
+import { TCPNotifyInfo, TCPTransferConfig } from '../model/TCPModels';
 import { FileUtils } from '../utils/FileUtils';
 import { TransferEventManager, TransferEventId } from '../event/TransferEvents';
 import { NetworkUtils } from '../utils/NetworkUtils';
@@ -120,9 +121,9 @@ export class TCPTransferProtocol implements TransferProtocolInterface {
    * TCP 作为发送端的完整流程：启动服务器 → 通知目标设备（config.notifyCallback）→ 等待连接 → 分块发送
    * @param data - 文件数据
    * @param taskId - 任务 ID
-   * @param config - 传输配置，config.notifyCallback 用于通知目标设备发起 TCP 连接
+   * @param config - TCP 传输配置，config.notifyCallback 用于通知目标设备发起 TCP 连接
    */
-  async send(data: ArrayBuffer | string, taskId: string, config?: TransferConfig): Promise<boolean> {
+  async send(data: ArrayBuffer | string, taskId: string, config?: TCPTransferConfig): Promise<boolean> {
     try {
       // 如果是字符串，先转换为 ArrayBuffer
       let fileData: ArrayBuffer;
@@ -145,7 +146,7 @@ export class TCPTransferProtocol implements TransferProtocolInterface {
       }
 
       // 服务器就绪，通知目标设备发起连接
-      // TODO 1. 文件hash加入信息 2. TCP这个类型
+      // 握手通知通过 MQTT 预发送，由调用方实现 notifyCallback
       if (config?.notifyCallback) {
         const notifyInfo: TCPNotifyInfo = {
           taskId,
@@ -297,10 +298,11 @@ export class TCPTransferProtocol implements TransferProtocolInterface {
 
   /**
    * 发送握手消息
+   * 注意：当前实现中，握手通知已通过 MQTT 预发送（由 notifyCallback 完成），
+   * 此方法保留用于后续可能的扩展（如需要在 TCP 连接建立后发送额外握手信息）
    */
   private async sendHandshake(taskId: string, handshakeInfo: TCPSendHandshakeInfo): Promise<boolean> {
-    // TODO: 实现握手消息发送（放在mqtt初始消息里
-    console.info(`[TCPTransferProtocol] 发送握手消息，taskId=${taskId}, fileName=${handshakeInfo.fileName}`);
+    console.info(`[TCPTransferProtocol] 握手信息已通过 MQTT 预发送，taskId=${taskId}, fileName=${handshakeInfo.fileName}`);
     return true;
   }
 
