@@ -18,7 +18,7 @@ export { MQTTTransferProtocol } from './protocol/MQTTTransferProtocol';
 export { TCPTransferProtocol } from './protocol/TCPTransferProtocol';
 
 // Socket 管理
-export { FileTransferSocketManager } from './socket/FileTransferSocketManager';
+export { FileTransferSocketManager, MessageCallback } from './socket/FileTransferSocketManager';
 
 // 数据模型
 export {
@@ -32,7 +32,14 @@ export {
 export {
   TCPNotifyInfo,
   TCPNotifyCallback,
-  TCPTransferConfig
+  TCPTransferConfig,
+  TCPMessageType,
+  TCPHandshakeMessage,
+  TCPChunkMessage,
+  TCPChunkAckMessage,
+  TCPCompleteMessage,
+  TCPErrorMessage,
+  TCPMessage
 } from './model/TCPModels';
 
 // 工具类

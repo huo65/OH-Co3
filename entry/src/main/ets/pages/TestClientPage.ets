@@ -115,7 +115,7 @@ export struct TestClientPage {
         Text(this.testResult).width('100%').backgroundColor('#f0f0f0').padding(10)
       }
       
-      // 销毁客户端按钮
+      // 销毁客户端按钮 TODO 结束的时候状态监控也停止
       Button('Destroy Client')
         .onClick(async () => {
           await this.client.destroy();

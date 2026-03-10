@@ -3,23 +3,37 @@
  * 基于 TCP Socket，处理大文件（>2MB）的分块传输
  */
 import { TransferProtocolInterface, TransferConfig, TransferState, TransferProgress } from '../protocol/TransferProtocolInterface';
-import { FileTransferSocketManager } from '../socket/FileTransferSocketManager';
-import { ChunkData } from '../model/TransferDataModels';
-import { TCPNotifyInfo, TCPTransferConfig } from '../model/TCPModels';
+import { FileTransferSocketManager, MessageCallback } from '../socket/FileTransferSocketManager';
+import { ChunkData, FileInfo } from '../model/TransferDataModels';
+import {
+  TCPNotifyInfo,
+  TCPTransferConfig,
+  TCPMessageType,
+  TCPHandshakeMessage,
+  TCPChunkMessage,
+  TCPChunkAckMessage,
+  TCPCompleteMessage,
+  TCPErrorMessage,
+  TCPMessage
+} from '../model/TCPModels';
 import { FileUtils } from '../utils/FileUtils';
 import { TransferEventManager, TransferEventId } from '../event/TransferEvents';
 import { NetworkUtils } from '../utils/NetworkUtils';
 
 /**
- * TCP 握手信息（发送端用）
+ * 接收状态信息
  */
-interface TCPSendHandshakeInfo {
-  fileId: string;
-  fileName: string;
-  size: number;
-  hash: string;
+interface ReceiveState {
+  taskId: string;
+  fileInfo: FileInfo;
   totalChunks: number;
-  chunkSize: number;
+  receivedChunks: number;
+  chunks: ChunkData[];
+  fileHash: string;
+  isComplete: boolean;
+  resolve?: (chunks: ChunkData[]) => void;
+  reject?: (error: Error) => void;
+  timeoutId?: number;
 }
 
 export class TCPTransferProtocol implements TransferProtocolInterface {
@@ -27,12 +41,14 @@ export class TCPTransferProtocol implements TransferProtocolInterface {
   private eventManager: TransferEventManager;
   private progressMap: Map<string, TransferProgress> = new Map();
   private chunkBuffers: Map<string, ChunkData[]> = new Map(); // 接收分块缓存
-  
+  private receiveStates: Map<string, ReceiveState> = new Map(); // 接收状态管理
+
   // 配置参数
   private readonly DEFAULT_CHUNK_SIZE = 128 * 1024; // 128KB
   private readonly DEFAULT_TIMEOUT = 30000; // 30 秒
   private readonly MAX_RETRIES = 3; // 最多重试 3 次
   private readonly DEFAULT_PORT = 8888; // 默认监听端口
+  private readonly RECEIVE_TIMEOUT = 300000; // 接收超时 5 分钟
 
   constructor() {
     this.socketManager = FileTransferSocketManager.getInstance();
@@ -170,44 +186,74 @@ export class TCPTransferProtocol implements TransferProtocolInterface {
       // 更新进度为传输中
       this.updateProgress(taskId, TransferState.TRANSFERRING, 0);
       
-      // 发送握手消息（包含文件信息）
-      const handshakeInfo: TCPSendHandshakeInfo = {
-        fileId: FileUtils.generateFileId(),
-        fileName: `file_${taskId}`,
-        size: fileData.byteLength,
-        hash: fileHash,
-        totalChunks: chunks.length,
-        chunkSize
-      };
-      const handshakeResult = await this.sendHandshake(taskId, handshakeInfo);
-      
-      if (!handshakeResult) {
-        throw new Error('握手失败');
+      // 等待客户端连接（最多等待 30 秒）
+      let connectionId: string | null = null;
+      let waitTime = 0;
+      while (waitTime < 30000) {
+        const connectionIds = this.socketManager.getConnectionIds();
+        if (connectionIds.length > 0) {
+          connectionId = connectionIds[0];
+          break;
+        }
+        await this.sleep(100);
+        waitTime += 100;
       }
-      
+
+      if (!connectionId) {
+        throw new Error('等待客户端连接超时');
+      }
+
+      console.info(`[TCPTransferProtocol] 客户端已连接，connectionId=${connectionId}`);
+
+      // 发送握手消息（包含文件信息）
+      const handshakeMessage: TCPHandshakeMessage = {
+        type: TCPMessageType.HANDSHAKE,
+        taskId,
+        fileInfo: { fileId: taskId, fileName: `file_${taskId}`, size: fileData.byteLength },
+        totalChunks: chunks.length,
+        chunkSize,
+        fileHash
+      };
+      const handshakeResult = await this.sendTCPMessage(connectionId, handshakeMessage);
+
+      if (!handshakeResult) {
+        throw new Error('握手消息发送失败');
+      }
+
+      console.info(`[TCPTransferProtocol] 握手消息已发送，等待分块确认...`);
+
       // 逐块发送文件数据
       let sentChunks = 0;
       for (let i = 0; i < chunks.length; i++) {
         const chunk = chunks[i];
-        
+
+        // 构建分块消息
+        const chunkMessage: TCPChunkMessage = {
+          type: TCPMessageType.CHUNK,
+          taskId,
+          chunkIndex: i,
+          data: chunk.data,
+          isLastChunk: i === chunks.length - 1
+        };
+
         // 重试机制
         let success = false;
         for (let retry = 0; retry < maxRetries; retry++) {
-          success = await this.sendChunk(chunk);
+          success = await this.sendTCPMessage(connectionId, chunkMessage);
           if (success) break;
-          
+
           console.warn(`[TCPTransferProtocol] 分块 ${i} 发送失败，重试 (${retry + 1}/${maxRetries})`);
           await this.sleep(500 * (retry + 1));
         }
-        
+
         if (!success) {
           throw new Error(`分块 ${i} 发送失败，超过最大重试次数`);
         }
-        
+
         sentChunks++;
         const progress = Math.round((sentChunks / chunks.length) * 100);
         this.updateProgress(taskId, TransferState.TRANSFERRING, progress);
-        
+
         // 触发分块接收事件
         this.eventManager.emit(
           TransferEventId.CHUNK_RECEIVED,
@@ -215,9 +261,14 @@ export class TCPTransferProtocol implements TransferProtocolInterface {
           `${i}/${chunks.length}`
         );
       }
-      
+
       // 发送完成消息
-      await this.sendComplete(taskId, fileHash);
+      const completeMessage: TCPCompleteMessage = {
+        type: TCPMessageType.COMPLETE,
+        taskId,
+        fileHash
+      };
+      await this.sendTCPMessage(connectionId, completeMessage);
       
       // 更新进度为完成
       this.updateProgress(taskId, TransferState.COMPLETED, 100);
@@ -225,6 +276,7 @@ export class TCPTransferProtocol implements TransferProtocolInterface {
       console.info(`[TCPTransferProtocol] 文件发送完成，taskId=${taskId}`);
       return true;
     } catch (error) {
+      // TODO 错误消息返回客户端
       console.error('[TCPTransferProtocol] 文件发送失败:', error);
       this.updateProgress(taskId, TransferState.FAILED, 0, JSON.stringify(error));
       return false;
@@ -239,29 +291,53 @@ export class TCPTransferProtocol implements TransferProtocolInterface {
   async receive(taskId: string): Promise<ArrayBuffer | string> {
     try {
       console.info(`[TCPTransferProtocol] 开始接收文件，taskId=${taskId}`);
-      
+
+      // 初始化接收状态
+      this.initReceiveState(taskId);
+
+      // 注册消息回调
+      this.socketManager.registerMessageCallback(taskId, this.createMessageHandler(taskId));
+
       // 等待所有分块接收完成
       const chunks = await this.waitForAllChunks(taskId);
-      
+
+      // 注销消息回调
+      this.socketManager.unregisterMessageCallback(taskId);
+
       if (!chunks || chunks.length === 0) {
         throw new Error('未接收到任何分块');
       }
-      
+
       // 重组文件
       const fileData = FileUtils.reassembleChunks(chunks);
-      
+
       // 验证哈希
-      const receivedHash = await FileUtils.calculateHash(fileData);
-      console.info(`[TCPTransferProtocol] 文件接收完成，哈希=${receivedHash.substring(0, 16)}...`);
-      
+      const receiveState = this.receiveStates.get(taskId);
+      if (receiveState && receiveState.fileHash) {
+        const receivedHash = await FileUtils.calculateHash(fileData);
+        if (receivedHash !== receiveState.fileHash) {
+          throw new Error('文件哈希校验失败');
+        }
+        console.info(`[TCPTransferProtocol] 文件哈希校验通过，哈希=${receivedHash.substring(0, 16)}...`);
+      }
+
       // 更新进度为完成
       this.updateProgress(taskId, TransferState.COMPLETED, 100);
-      
+
+      // 清理接收状态
+      this.receiveStates.delete(taskId);
+      this.chunkBuffers.delete(taskId);
+
       return fileData;
     } catch (error) {
       const errMsg: string = error instanceof Error ? error.message : String(error);
       console.error('[TCPTransferProtocol] 文件接收失败:', errMsg);
       this.updateProgress(taskId, TransferState.FAILED, 0, errMsg);
+
+      // 清理资源
+      this.socketManager.unregisterMessageCallback(taskId);
+      this.receiveStates.delete(taskId);
+
       throw new Error(errMsg);
     }
   }
@@ -297,45 +373,277 @@ export class TCPTransferProtocol implements TransferProtocolInterface {
   }
 
   /**
-   * 发送握手消息
-   * 注意：当前实现中，握手通知已通过 MQTT 预发送（由 notifyCallback 完成），
-   * 此方法保留用于后续可能的扩展（如需要在 TCP 连接建立后发送额外握手信息）
+   * 初始化接收状态
    */
-  private async sendHandshake(taskId: string, handshakeInfo: TCPSendHandshakeInfo): Promise<boolean> {
-    console.info(`[TCPTransferProtocol] 握手信息已通过 MQTT 预发送，taskId=${taskId}, fileName=${handshakeInfo.fileName}`);
-    return true;
+  private initReceiveState(taskId: string): void {
+    const receiveState: ReceiveState = {
+      taskId,
+      fileInfo: { fileId: taskId, fileName: '', size: 0 },
+      totalChunks: 0,
+      receivedChunks: 0,
+      chunks: [],
+      fileHash: '',
+      isComplete: false
+    };
+    this.receiveStates.set(taskId, receiveState);
+    this.chunkBuffers.set(taskId, []);
   }
 
   /**
-   * 发送分块数据
+   * 创建消息处理器
    */
-  private async sendChunk(chunk: ChunkData): Promise<boolean> {
-    const connectionIds: string[] = this.socketManager.getConnectionIds();
-    if (connectionIds.length === 0) {
-      console.error('[TCPTransferProtocol] 没有可用的连接');
+  private createMessageHandler(taskId: string): MessageCallback {
+    return (connectionId: string, data: ArrayBuffer) => {
+      try {
+        this.handleIncomingMessage(taskId, connectionId, data);
+      } catch (error) {
+        console.error(`[TCPTransferProtocol] 消息处理失败，taskId=${taskId}:`, error);
+      }
+    };
+  }
+
+  /**
+   * 处理接收到的 TCP 消息
+   */
+  private handleIncomingMessage(taskId: string, connectionId: string, data: ArrayBuffer): void {
+    const receiveState = this.receiveStates.get(taskId);
+    if (!receiveState) {
+      console.warn(`[TCPTransferProtocol] 未找到接收状态，taskId=${taskId}`);
+      return;
+    }
+
+    // 解析消息
+    const message = this.parseTCPMessage(data);
+    if (!message) {
+      console.error(`[TCPTransferProtocol] 消息解析失败，taskId=${taskId}`);
+      return;
+    }
+
+    console.info(`[TCPTransferProtocol] 收到消息，type=${message.type}, taskId=${taskId}`);
+
+    switch (message.type) {
+      case TCPMessageType.HANDSHAKE:
+        this.handleHandshakeMessage(taskId, message as TCPHandshakeMessage);
+        break;
+      case TCPMessageType.CHUNK:
+        this.handleChunkMessage(taskId, message as TCPChunkMessage);
+        break;
+      case TCPMessageType.COMPLETE:
+        this.handleCompleteMessage(taskId, message as TCPCompleteMessage);
+        break;
+      case TCPMessageType.ERROR:
+        this.handleErrorMessage(taskId, message as TCPErrorMessage);
+        break;
+      default:
+        console.warn(`[TCPTransferProtocol] 未知消息类型，type=${message.type}`);
+    }
+  }
+
+  /**
+   * 解析 TCP 消息
+   * 消息格式：前 4 字节为 JSON 头部长度，后面是 JSON 数据
+   */
+  private parseTCPMessage(data: ArrayBuffer): TCPMessage | null {
+    try {
+      if (data.byteLength < 4) {
+        return null;
+      }
+
+      // 读取头部长度
+      const headerLengthView = new DataView(data, 0, 4);
+      const headerLength = headerLengthView.getInt32(0, false); // 大端序
+
+      if (headerLength <= 0 || headerLength > data.byteLength - 4) {
+        console.error(`[TCPTransferProtocol] 无效的消息头长度：${headerLength}`);
+        return null;
+      }
+
+      // 解析 JSON 头部
+      const headerBytes = new Uint8Array(data, 4, headerLength);
+      // 创建一个新的 ArrayBuffer 拷贝，只包含头部数据
+      const headerBuffer = new ArrayBuffer(headerLength);
+      new Uint8Array(headerBuffer).set(headerBytes);
+      const headerJson = FileUtils.arrayBufferToString(headerBuffer);
+      const header = JSON.parse(headerJson) as TCPMessage;
+
+      return header;
+    } catch (error) {
+      console.error('[TCPTransferProtocol] 消息解析失败:', error);
+      return null;
+    }
+  }
+
+  /**
+   * 序列化并发送 TCP 消息
+   */
+  private async sendTCPMessage(connectionId: string, message: TCPMessage): Promise<boolean> {
+    try {
+      // 构建消息头部（分块消息的数据单独处理，不包含在 JSON 中）
+      let messageToSend: TCPMessage = message;
+      let dataBytes: ArrayBuffer | null = null;
+
+      if (message.type === TCPMessageType.CHUNK) {
+        const chunkMessage = message as TCPChunkMessage;
+        // 分块消息：将数据转为 Base64 放入 JSON，避免二进制序列化问题
+        // 确保 data 是 ArrayBuffer 类型
+        if (typeof chunkMessage.data !== 'string') {
+          dataBytes = chunkMessage.data;
+          messageToSend = {
+            type: chunkMessage.type,
+            taskId: chunkMessage.taskId,
+            chunkIndex: chunkMessage.chunkIndex,
+            data: FileUtils.arrayBufferToBase64(chunkMessage.data),
+            isLastChunk: chunkMessage.isLastChunk
+          } as TCPMessage;
+        }
+      }
+
+      // 序列化消息头部
+      const headerJson = JSON.stringify(messageToSend);
+      const headerBytes = FileUtils.stringToArrayBuffer(headerJson);
+
+      // 构建完整消息：4 字节头部长度 + JSON 头部
+      const totalLength = 4 + headerBytes.byteLength;
+      const fullMessage = new ArrayBuffer(totalLength);
+      const fullView = new Uint8Array(fullMessage);
+
+      // 写入头部长度（大端序）
+      const lengthView = new DataView(fullMessage, 0, 4);
+      lengthView.setInt32(0, headerBytes.byteLength, false);
+
+      // 写入头部
+      fullView.set(new Uint8Array(headerBytes), 4);
+
+      return await this.socketManager.sendData(connectionId, fullMessage);
+    } catch (error) {
+      console.error('[TCPTransferProtocol] 消息发送失败:', error);
       return false;
     }
-    
-    const connectionId = connectionIds[0];
-    return await this.socketManager.sendData(connectionId, chunk.data);
   }
 
   /**
-   * 发送完成消息
+   * 处理握手消息
    */
-  private async sendComplete(taskId: string, fileHash: string): Promise<boolean> {
-    // TODO: 实现完成消息发送
-    console.info(`[TCPTransferProtocol] 发送完成消息，taskId=${taskId}, hash=${fileHash.substring(0, 16)}`);
-    return true;
+  private handleHandshakeMessage(taskId: string, message: TCPHandshakeMessage): void {
+    const receiveState = this.receiveStates.get(taskId);
+    if (!receiveState) return;
+
+    receiveState.fileInfo = message.fileInfo;
+    receiveState.totalChunks = message.totalChunks;
+    receiveState.fileHash = message.fileHash;
+
+    console.info(`[TCPTransferProtocol] 握手消息已接收，taskId=${taskId}, totalChunks=${message.totalChunks}`);
+
+    // 更新进度
+    this.updateProgress(taskId, TransferState.TRANSFERRING, 0);
+  }
+
+  /**
+   * 处理分块消息
+   */
+  private handleChunkMessage(taskId: string, message: TCPChunkMessage): void {
+    const receiveState = this.receiveStates.get(taskId);
+    if (!receiveState) return;
+
+    // 解析分块数据（可能是 Base64 字符串或 ArrayBuffer）
+    let chunkData: ArrayBuffer;
+    if (typeof message.data === 'string') {
+      // Python 端发送的是 Base64 字符串
+      chunkData = FileUtils.base64ToArrayBuffer(message.data);
+    } else {
+      // ETS 端内部传递的是 ArrayBuffer
+      chunkData = message.data;
+    }
+
+    // 创建分块数据
+    const chunk: ChunkData = {
+      taskId,
+      chunkIndex: message.chunkIndex,
+      totalChunks: receiveState.totalChunks,
+      data: chunkData,
+      chunkSize: chunkData.byteLength,
+      isLastChunk: message.isLastChunk
+    };
+
+    // 缓存分块
+    receiveState.chunks.push(chunk);
+    receiveState.receivedChunks++;
+
+    // 更新缓存
+    this.chunkBuffers.set(taskId, receiveState.chunks);
+
+    // 更新进度
+    const progress = receiveState.totalChunks > 0
+      ? Math.round((receiveState.receivedChunks / receiveState.totalChunks) * 100)
+      : 0;
+    this.updateProgress(taskId, TransferState.TRANSFERRING, progress);
+
+    // 触发分块接收事件
+    this.eventManager.emit(
+      TransferEventId.CHUNK_RECEIVED,
+      taskId,
+      `${message.chunkIndex}/${receiveState.totalChunks}`
+    );
+
+    console.info(`[TCPTransferProtocol] 分块已接收，taskId=${taskId}, chunkIndex=${message.chunkIndex}`);
+  }
+
+  /**
+   * 处理完成消息
+   */
+  private handleCompleteMessage(taskId: string, message: TCPCompleteMessage): void {
+    const receiveState = this.receiveStates.get(taskId);
+    if (!receiveState) return;
+
+    receiveState.fileHash = message.fileHash;
+    receiveState.isComplete = true;
+
+    console.info(`[TCPTransferProtocol] 完成消息已接收，taskId=${taskId}`);
+
+    // 解析 Promise
+    if (receiveState.resolve) {
+      receiveState.resolve(receiveState.chunks);
+    }
+  }
+
+  /**
+   * 处理错误消息
+   */
+  private handleErrorMessage(taskId: string, message: TCPErrorMessage): void {
+    console.error(`[TCPTransferProtocol] 收到错误消息，taskId=${taskId}, error=${message.errorMessage}`);
+
+    const receiveState = this.receiveStates.get(taskId);
+    if (receiveState && receiveState.reject) {
+      receiveState.reject(new Error(message.errorMessage));
+    }
   }
 
   /**
    * 等待所有分块接收完成
    */
   private async waitForAllChunks(taskId: string): Promise<ChunkData[]> {
-    // TODO: ！！！需要实现异步等待逻辑
-    // 这里简化返回缓存的分块
-    return this.chunkBuffers.get(taskId) || [];
+    return new Promise((resolve, reject) => {
+      const receiveState = this.receiveStates.get(taskId);
+      if (!receiveState) {
+        reject(new Error('接收状态未初始化'));
+        return;
+      }
+
+      // 如果已经完成，直接返回
+      if (receiveState.isComplete) {
+        resolve(receiveState.chunks);
+        return;
+      }
+
+      // 保存 resolve/reject 以便异步回调中使用
+      receiveState.resolve = resolve;
+      receiveState.reject = reject;
+
+      // 设置超时
+      receiveState.timeoutId = setTimeout(() => {
+        reject(new Error('接收分块超时'));
+      }, this.RECEIVE_TIMEOUT);
+    });
   }
 
   /**

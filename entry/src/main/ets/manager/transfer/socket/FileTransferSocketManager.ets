@@ -25,6 +25,12 @@ export interface TCPConnectionInfo {
 }
 
 /**
+ * 消息回调函数类型
+ * 用于接收 TCP 消息通知
+ */
+export type MessageCallback = (connectionId: string, data: ArrayBuffer) => void;
+
+/**
  * TCP Socket 管理类
  * 负责管理所有 TCP 连接的生命周期
  */
@@ -36,12 +42,15 @@ export class FileTransferSocketManager {
   
   /** 客户端连接池 */
   private connections: Map<string, TCPConnectionInfo> = new Map();
-  
+
   /** 是否正在监听 */
   private isListening: boolean = false;
-  
+
   /** 监听端口 */
   private listenPort: number = 8888;
+
+  /** 消息回调映射（按任务 ID 注册） */
+  private messageCallbacks: Map<string, MessageCallback> = new Map();
 
   private constructor() {}
 
@@ -136,11 +145,31 @@ export class FileTransferSocketManager {
   }
 
   /**
-   * 设置消息处理器
+   * 设置消息处理器（服务器端连接）
    */
   private setupMessageHandler(
     connectionId: string,
     client: socket.TCPSocketConnection
+  ): void {
+    this.setupMessageListener(connectionId, client);
+  }
+
+  /**
+   * 设置消息处理器（客户端连接）
+   */
+  private setupClientMessageHandler(
+    connectionId: string,
+    client: socket.TCPSocket
+  ): void {
+    this.setupMessageListener(connectionId, client);
+  }
+
+  /**
+   * 通用的消息监听设置
+   */
+  private setupMessageListener(
+    connectionId: string,
+    client: socket.TCPSocket | socket.TCPSocketConnection
   ): void {
     interface MessageValue {
       message?: ArrayBuffer;
@@ -151,10 +180,54 @@ export class FileTransferSocketManager {
       if (conn) {
         conn.lastActiveAt = Date.now();
       }
-      
-      // 这里可以添加消息处理逻辑
-      console.info(`[FileTransferSocketManager] 收到消息，connectionId=${connectionId}`);
+
+      // 获取消息数据
+      const messageData = value.message;
+      if (!messageData) {
+        console.warn(`[FileTransferSocketManager] 收到空消息，connectionId=${connectionId}`);
+        return;
+      }
+
+      console.info(`[FileTransferSocketManager] 收到消息，connectionId=${connectionId}, size=${messageData.byteLength}`);
+
+      // 通知所有注册的回调
+      this.messageCallbacks.forEach((callback, taskId) => {
+        try {
+          callback(connectionId, messageData);
+        } catch (error) {
+          console.error(`[FileTransferSocketManager] 消息回调执行失败，taskId=${taskId}:`, error);
+        }
+      });
     });
+  }
+
+  /**
+   * 注册消息回调
+   * @param taskId - 任务 ID
+   * @param callback - 消息回调函数
+   */
+  registerMessageCallback(taskId: string, callback: MessageCallback): void {
+    this.messageCallbacks.set(taskId, callback);
+    console.info(`[FileTransferSocketManager] 消息回调已注册，taskId=${taskId}`);
+  }
+
+  /**
+   * 注销消息回调
+   * @param taskId - 任务 ID
+   */
+  unregisterMessageCallback(taskId: string): void {
+    this.messageCallbacks.delete(taskId);
+    console.info(`[FileTransferSocketManager] 消息回调已注销，taskId=${taskId}`);
+  }
+
+  /**
+   * 获取指定连接的 Socket 对象
+   * @param connectionId - 连接 ID
+   * @returns Socket 对象，不存在返回 null
+   */
+  getSocket(connectionId: string): socket.TCPSocket | socket.TCPSocketConnection | null {
+    const connection = this.connections.get(connectionId);
+    return connection ? connection.socket : null;
   }
 
   /**
@@ -217,9 +290,18 @@ export class FileTransferSocketManager {
         createdAt: Date.now(),
         lastActiveAt: Date.now()
       };
-      
+
       this.connections.set(connectionId, connectionInfo);
-      
+
+      // 设置消息接收处理（客户端也需要接收消息）
+      this.setupClientMessageHandler(connectionId, tcpClient);
+
+      // 设置关闭处理
+      tcpClient.on('close', () => {
+        console.info(`[FileTransferSocketManager] 客户端连接关闭：${connectionId}`);
+        this.removeConnection(connectionId);
+      });
+
       return connectionId;
     } catch (error) {
       console.error('[FileTransferSocketManager] 连接失败:', error);
