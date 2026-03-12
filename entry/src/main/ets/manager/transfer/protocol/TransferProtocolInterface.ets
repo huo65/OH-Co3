@@ -46,6 +46,12 @@ export interface TransferConfig {
   sourceDevice?: string;
   /** 目标设备标识（可选） */
   targetDevice?: string;
+  /** 目标主机地址（用于连接） */
+  host?: string;
+  /** 目标端口（用于连接） */
+  port?: number;
+  /** 任务 ID */
+  taskId?: string;
   /** 额外协议参数（用于协议特定配置） */
   protocolParams?: Record<string, Object>;
 }
@@ -91,12 +97,11 @@ export interface TransferProtocolInterface {
 
   /**
    * 连接到目标设备
-   * @param host - 目标主机地址
-   * @param port - 目标端口
-   * @param config - 传输配置
+   * 协议实现从 config 中获取连接所需的参数（如 host、port 等）
+   * @param config - 传输配置，包含连接所需的所有参数
    * @returns 连接结果
    */
-  connect(host: string, port: number, config?: TransferConfig): Promise<TransferResult<boolean>>;
+  connect(config: TransferConfig): Promise<TransferResult<boolean>>;
 
   /**
    * 断开连接

@@ -33,13 +33,18 @@ class TaskTransmitData {
    */
   params: InferenceTask;
   /**
-   * 源设备 IP 地址（TCP 传输时使用）
+   * 源设备标识（如 IP 地址或设备 ID，具体含义由传输协议决定）
+   * @deprecated 使用 sourceDevice 替代
    */
   sourceIp?: string;
   /**
-   * 传输类型：'direct' - 直接传输，'tcp' - TCP 大文件传输
+   * 源设备标识（如 IP 地址或设备 ID，具体含义由传输协议决定）
    */
-  transferType?: 'direct' | 'tcp';
+  sourceDevice?: string;
+  /**
+   * 传输类型：'direct' - 直接传输，其他值表示使用对应协议（如 'TCP', 'UDP', 'HTTP' 等）
+   */
+  transferType:  string;
   /**
    * 文件哈希值（用于校验）
    */
@@ -51,7 +56,7 @@ class TaskTransmitData {
     this.toClient = "";
     this.timestamp = 0;
     this.params = {taskId:"", modelName:"", type: InferenceInputType.IMAGE, data: { imageData: "" } };
-    this.sourceIp = undefined;
+    this.sourceDevice = undefined;
     this.transferType = 'direct';
     this.fileHash = undefined;
   }
@@ -139,10 +144,9 @@ class TaskDispatch{
         const notifyCallback: TransferNotifyCallback = async (notifyInfo): Promise<void> => {
           // 将通用通知信息转换为 TCP 特有类型
           const tcpNotifyInfo: TCPNotifyInfo = notifyInfo as TCPNotifyInfo;
-          taskInfo.transferType = 'tcp';
+          taskInfo.transferType = 'TCP';
           taskInfo.params.data = '';
-          // 从 TCPNotifyInfo 中获取 TCP 特有字段
-          taskInfo.sourceIp = tcpNotifyInfo.sourceIp;
+          taskInfo.sourceDevice = tcpNotifyInfo.sourceIp;
           const taskInfoMessage = JSON.stringify(taskInfo);
           await MQTTInstance.pushMessage(taskInfoMessage, '/task/assign');
           console.info(`[TaskDispatch] 已通过 MQTT 通知目标设备发起连接，sourceIp=${tcpNotifyInfo.sourceIp}, port=${tcpNotifyInfo.port}`);
@@ -204,9 +208,9 @@ class TaskDispatch{
   }
 
   /**
-   * 解析接收到的任务消息并处理 TODO接收文件扩展
+   * 解析接收到的任务消息并处理
    * - 直接传输（direct）：直接执行本地推理
-   * - TCP 大文件传输（tcp）：委托 FileTransferManager 建立连接并接收文件，再执行推理
+   * - 大文件传输（tcp 或其他协议）：委托 FileTransferManager 建立连接并接收文件，再执行推理
    * @param message - 接收到的任务消息 JSON 字符串
    */
   async parseTaskMessage(message: string) {
@@ -217,11 +221,14 @@ class TaskDispatch{
       return;
     }
 
-    if (taskInfo.transferType === 'tcp' && taskInfo.sourceIp) {
-      // 大文件 TCP 传输：委托 FileTransferManager 接收文件
-      console.info('收到 TCP 大文件传输任务，委托 FileTransferManager 建立连接并接收');
+    // 判断是否需要文件传输（transferType 不为 'direct' 且有源设备地址）
+    if (taskInfo.transferType !== 'direct') {
+      // 大文件传输：委托 FileTransferManager 接收文件
+      // transferType 的值即为协议名称（如 'TCP', 'UDP' 等）
+      const protocolName = taskInfo.transferType;
+      console.info(`收到 ${protocolName} 大文件传输任务，委托 FileTransferManager 建立连接并接收`);
       try {
-        const fileInfo: FileInfo= {
+        const fileInfo: FileInfo = {
           fileId: taskInfo.taskId,
           fileName: taskInfo.taskId,
           size: 0,
@@ -229,10 +236,11 @@ class TaskDispatch{
         };
         const fileResult = await FileTransferManager.getInstance().receiveFile(
           taskInfo.taskId,
-          taskInfo.sourceIp,
-          fileInfo
+          taskInfo.sourceDevice as string,
+          fileInfo,
+          protocolName
         );
-        // TODO 注销TCP
+        // TODO 注销连接
 
         // 将接收到的文件数据还原到任务参数
         if (fileResult.success && fileResult.data instanceof ArrayBuffer) {
@@ -250,7 +258,7 @@ class TaskDispatch{
         // 执行推理并返回结果
         await this.executeAndReturn(taskInfo);
       } catch (error) {
-        console.error('[TaskDispatch] TCP 文件接收失败:', error);
+        console.error(`[TaskDispatch] ${protocolName} 文件接收失败:`, error);
       }
     } else {
       // 直接传输：执行本地推理并返回结果

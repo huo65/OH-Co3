@@ -131,10 +131,14 @@ export class TCPTransferProtocol implements CapableProtocolInterface {
 
   /**
    * 连接到远程设备（作为客户端）
+   * 从 config 中获取 host 和 port 参数
    */
-  async connect(host: string, port: number = this.DEFAULT_PORT, config?: TransferConfig): Promise<TransferResult<boolean>> {
+  async connect(config: TransferConfig): Promise<TransferResult<boolean>> {
     try {
-      const timeout = config?.timeout || this.DEFAULT_TIMEOUT;
+      // 从 config 中获取连接参数
+      const host = config.host || 'localhost';
+      const port = config.port || this.DEFAULT_PORT;
+      const timeout = config.timeout || this.DEFAULT_TIMEOUT;
 
       console.info(`[TCPTransferProtocol] 开始连接到 ${host}:${port}`);
 

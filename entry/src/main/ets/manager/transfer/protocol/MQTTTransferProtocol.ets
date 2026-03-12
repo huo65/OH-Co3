@@ -114,8 +114,9 @@ export class MQTTTransferProtocol implements CapableProtocolInterface {
   /**
    * 连接到 MQTT 服务器
    * MQTT 连接在初始化时已建立，这里只检查连接状态
+   * 参数从 config 中获取（虽然 MQTT 不使用 host/port，但保持接口一致性）
    */
-  async connect(host: string, port: number, config?: TransferConfig): Promise<TransferResult<boolean>> {
+  async connect(config: TransferConfig): Promise<TransferResult<boolean>> {
     try {
       const isConnected = await this.mqttClient.isCon();
       if (isConnected) {

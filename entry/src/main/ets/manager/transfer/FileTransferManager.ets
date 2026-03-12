@@ -275,64 +275,75 @@ export class FileTransferManager {
 
   /**
    * 接收文件（接收端入口）
+   * 调用方通过 protocolName 显式指定协议，协议内部自行处理接收全流程
+   * FileTransferManager 层无需感知具体协议实现细节
    * @param taskId - 任务 ID
-   * @param sourceIp - 源设备 IP 地址
+   * @param sourceDevice - 源设备标识（如 IP 地址或设备 ID，具体含义由协议决定）
    * @param fileInfo - 文件元数据
+   * @param protocolName - 指定使用的传输协议名称（需已在 ProtocolRegistry 中注册）
    * @param options - 可选传输配置
    * @returns 接收结果，包含文件数据
    */
   async receiveFile(
     taskId: string,
-    sourceIp: string,
+    sourceDevice: string,
     fileInfo: FileInfo,
+    protocolName: string,
     options?: TransferOptions
   ): Promise<TransferResult<ArrayBuffer | string>> {
-    const port = options?.tcpPort ?? this.defaultOptions.tcpPort ?? 8888;
-    console.info(`[FileTransferManager] 开始接收文件，taskId=${taskId}, sourceIp=${sourceIp}:${port}`);
+    console.info(`[FileTransferManager] 开始接收文件，taskId=${taskId}, protocol=${protocolName}, sourceDevice=${sourceDevice}`);
 
     // 记录接收任务
     const task: TransferTask = {
       taskId,
       fileInfo,
-      sourceDevice: sourceIp,
+      sourceDevice: sourceDevice,
       targetDevice: NetworkUtils.getIpAddress(),
-      protocol: 'TCP',
+      protocol: protocolName,
       state: TransferState.CONNECTING,
-      sourceIp,
-      port,
       createdAt: Date.now(),
       startedAt: Date.now()
     };
     this.taskQueue.set(taskId, task);
 
-    // 获取 TCP 协议实例
-    const protocol = this.protocolRegistry.getProtocol('TCP');
+    // 获取指定协议实例
+    const protocol = this.protocolRegistry.getProtocol(protocolName);
     if (!protocol) {
       task.state = TransferState.FAILED;
       const error = createErrorResult(
         taskId,
         TransferErrorCode.PROTOCOL_NOT_FOUND,
-        'TCP 协议未注册'
+        `协议 ${protocolName} 未注册`
       );
       this.eventManager.emitTransferFailed(taskId, error.error!.message);
       return error;
     }
 
-    this.eventManager.emitTransferStart(taskId, 'TCP');
+    this.eventManager.emitTransferStart(taskId, protocolName);
 
     try {
-      // 建立连接
+      // 构造传输配置
+      // 所有连接参数都通过 TransferConfig 传递，协议实现自行解析所需参数
       const config: TransferConfig = {
+        taskId,
         chunkSize: options?.tcpChunkSize ?? this.defaultOptions.tcpChunkSize,
         maxRetries: options?.maxRetries ?? this.defaultOptions.maxRetries,
         timeout: options?.timeout ?? this.defaultOptions.timeout,
-        fileInfo
+        fileInfo,
+        sourceDevice,
+        targetDevice: NetworkUtils.getIpAddress(),
+        host: sourceDevice,  // 对于 TCP 等协议，sourceDevice 即为 host
+        port: options?.tcpPort ?? this.defaultOptions.tcpPort ?? 8888,
       };
 
-      const connectResult = await protocol.connect(sourceIp, port, config);
+
+      // 调用协议实现的 connect 方法
+      // 协议实现从 config 中获取连接所需的参数
+      const connectResult = await protocol.connect(config);
+
       if (!connectResult.success) {
         task.state = TransferState.FAILED;
-        const errorMsg = connectResult.error?.message || `无法连接到源设备 ${sourceIp}:${port}`;
+        const errorMsg = connectResult.error?.message || `无法连接到源设备 ${sourceDevice}`;
         this.eventManager.emitTransferFailed(taskId, errorMsg);
         return createErrorResult(
           taskId,
@@ -357,7 +368,7 @@ export class FileTransferManager {
           duration,
           transferredBytes: fileInfo.size,
           averageSpeed: fileInfo.size / (duration / 1000),
-          protocol: 'TCP'
+          protocol: protocolName
         };
 
         this.eventManager.emitTransferComplete(taskId, completeResult);
