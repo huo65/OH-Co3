@@ -31,8 +31,6 @@ export {
 // TCP 专用数据模型
 export {
   TCPNotifyInfo,
-  TCPNotifyCallback,
-  TCPTransferConfig,
   TCPMessageType,
   TCPHandshakeMessage,
   TCPChunkMessage,

@@ -3,7 +3,7 @@
  * 包含 TCP 协议特有的数据结构和类型定义
  */
 
-import { TransferConfig } from '../protocol/TransferProtocolInterface';
+import { TransferConfig, TransferNotifyInfo, TransferNotifyCallback } from '../protocol/TransferProtocolInterface';
 import { FileInfo, ChunkData } from './TransferDataModels';
 
 /**
@@ -20,19 +20,14 @@ export enum TCPMessageType {
 
 /**
  * TCP 传输通知信息
+ * 继承通用传输通知接口，添加 TCP 协议特有字段
  * 发送端启动 TCP 服务器后，将此信息通过 MQTT 通知目标设备发起连接
  */
-export interface TCPNotifyInfo {
-  /** 任务 ID */
-  taskId: string;
-  /** 源设备 IP 地址 */
+export interface TCPNotifyInfo extends TransferNotifyInfo {
+  /** 源设备 IP 地址（TCP 特有） */
   sourceIp: string;
-  /** TCP 监听端口 */
+  /** TCP 监听端口（TCP 特有） */
   port: number;
-  /** 文件元数据 */
-  fileInfo: FileInfo;
-  /** 文件哈希值（用于校验） */
-  fileHash?: string;
 }
 
 /**
@@ -41,17 +36,6 @@ export interface TCPNotifyInfo {
  */
 export type TCPNotifyCallback = (notifyInfo: TCPNotifyInfo) => Promise<void>;
 
-/**
- * TCP 传输配置接口
- * 扩展通用 TransferConfig，添加 TCP 协议特有的配置项
- */
-export interface TCPTransferConfig extends TransferConfig {
-  /**
-   * TCP 服务器就绪后的通知回调
-   * 由 TCPTransferProtocol.send 在服务器启动后调用，调用方需实现此回调以通知目标设备发起连接
-   */
-  notifyCallback?: TCPNotifyCallback;
-}
 
 /**
  * TCP 握手消息（通过 TCP 连接发送）

@@ -4,7 +4,7 @@ import { InferenceResult, InferenceInputType, ImageInputData } from '../../worke
 import { ownName } from '../monitor/NodeInfoSyn';
 import { MQTTClient } from '../MQTTClient'
 import { systemDateTime } from '@kit.BasicServicesKit';
-import { FileTransferManager, TCPNotifyCallback } from '../../transfer/FileTransferManager';
+import { FileTransferManager, TransferNotifyCallback } from '../../transfer/FileTransferManager';
 import { FileUtils } from '../../transfer/utils/FileUtils';
 import { FileInfo } from '../../transfer/model/TransferDataModels';
 import { TCPNotifyInfo } from '../../transfer/model/TCPModels';
@@ -111,7 +111,6 @@ class TaskDispatch{
    * @param taskInfo - 待发送的完整任务传输数据
    * @returns 发送是否成功
    */
-  // TODO 目前先基于TCP调通，后续扩展纯接口实现　：notifyCallback
   async sendTask(taskInfo: TaskTransmitData): Promise<boolean> {
     const MQTTInstance: MQTTClient = MQTTClient.getInstance();
     try {
@@ -136,17 +135,17 @@ class TaskDispatch{
 
         // 调用 FileTransferManager 并传入 notifyCallback
         // 当 TCP 服务器就绪后，FileTransferManager 会调用此回调，
-        // TaskDispatch 将通过 MQTT 通知目标设备发起 TCP 连接
-        const notifyCallback: TCPNotifyCallback = async (notifyInfo: TCPNotifyInfo): Promise<void> => {
+        // TaskDispatch 将通过 MQTT 通知目标设备发起连接
+        const notifyCallback: TransferNotifyCallback = async (notifyInfo): Promise<void> => {
+          // 将通用通知信息转换为 TCP 特有类型
+          const tcpNotifyInfo: TCPNotifyInfo = notifyInfo as TCPNotifyInfo;
           taskInfo.transferType = 'tcp';
-          taskInfo.params.data = ''
-          taskInfo.sourceIp = notifyInfo.sourceIp;
-          if (notifyInfo.fileHash !== undefined) {
-            taskInfo.fileHash = notifyInfo.fileHash;
-          }
+          taskInfo.params.data = '';
+          // 从 TCPNotifyInfo 中获取 TCP 特有字段
+          taskInfo.sourceIp = tcpNotifyInfo.sourceIp;
           const taskInfoMessage = JSON.stringify(taskInfo);
           await MQTTInstance.pushMessage(taskInfoMessage, '/task/assign');
-          console.info(`[TaskDispatch] 已通过 MQTT 通知目标设备发起 TCP 连接，sourceIp=${notifyInfo.sourceIp}`);
+          console.info(`[TaskDispatch] 已通过 MQTT 通知目标设备发起连接，sourceIp=${tcpNotifyInfo.sourceIp}, port=${tcpNotifyInfo.port}`);
         };
 
         await FileTransferManager.getInstance().transferFile(
@@ -205,8 +204,7 @@ class TaskDispatch{
   }
 
   /**
-   * 解析接收到的任务消息并处理
-   * TODO接收文件扩展
+   * 解析接收到的任务消息并处理 TODO接收文件扩展
    * - 直接传输（direct）：直接执行本地推理
    * - TCP 大文件传输（tcp）：委托 FileTransferManager 建立连接并接收文件，再执行推理
    * @param message - 接收到的任务消息 JSON 字符串

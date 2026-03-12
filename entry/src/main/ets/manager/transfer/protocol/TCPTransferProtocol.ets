@@ -7,7 +7,6 @@ import { FileTransferSocketManager, MessageCallback } from '../socket/FileTransf
 import { ChunkData, FileInfo } from '../model/TransferDataModels';
 import {
   TCPNotifyInfo,
-  TCPTransferConfig,
   TCPMessageType,
   TCPHandshakeMessage,
   TCPChunkMessage,
@@ -137,9 +136,9 @@ export class TCPTransferProtocol implements TransferProtocolInterface {
    * TCP 作为发送端的完整流程：启动服务器 → 通知目标设备（config.notifyCallback）→ 等待连接 → 分块发送
    * @param data - 文件数据
    * @param taskId - 任务 ID
-   * @param config - TCP 传输配置，config.notifyCallback 用于通知目标设备发起 TCP 连接
+   * @param config - 传输配置，config.notifyCallback 用于通知目标设备发起 TCP 连接
    */
-  async send(data: ArrayBuffer | string, taskId: string, config?: TCPTransferConfig): Promise<boolean> {
+  async send(data: ArrayBuffer | string, taskId: string, config?: TransferConfig): Promise<boolean> {
     try {
       // 如果是字符串，先转换为 ArrayBuffer
       let fileData: ArrayBuffer;
@@ -162,13 +161,15 @@ export class TCPTransferProtocol implements TransferProtocolInterface {
       }
 
       // 服务器就绪，通知目标设备发起连接
-      // 握手通知通过 MQTT 预发送，由调用方实现 notifyCallback
       if (config?.notifyCallback) {
+        const fileInfo: FileInfo = {
+          fileId: taskId,
+          fileName: `file_${taskId}`,
+          size: fileData.byteLength
+        };
         const notifyInfo: TCPNotifyInfo = {
-          taskId,
           sourceIp: NetworkUtils.getIpAddress(),
-          port,
-          fileInfo: { fileId: taskId, fileName: `file_${taskId}`, size: fileData.byteLength }
+          port: port,
         };
         await config.notifyCallback(notifyInfo);
         console.info(`[TCPTransferProtocol] 已通知目标设备发起 TCP 连接，taskId=${taskId}`);

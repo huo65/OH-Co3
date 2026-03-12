@@ -2,20 +2,19 @@
  * 文件传输管理器
  * 统一管理所有文件传输任务，由调用方显式指定传输协议，提供完整的传输管理功能
  */
-import { TransferProtocolInterface, TransferState, TransferProgress, TransferConfig } from './protocol/TransferProtocolInterface';
+import { TransferProtocolInterface, TransferState, TransferProgress, TransferConfig, TransferNotifyCallback } from './protocol/TransferProtocolInterface';
 import { ProtocolRegistry } from './protocol/ProtocolRegistry';
 import { MQTTTransferProtocol } from './protocol/MQTTTransferProtocol';
 import { TCPTransferProtocol } from './protocol/TCPTransferProtocol';
 import { FileInfo, TransferTask, TransferOptions } from './model/TransferDataModels';
-import { TCPNotifyCallback, TCPTransferConfig } from './model/TCPModels';
 import { NetworkUtils } from './utils/NetworkUtils';
 import { TransferEventManager } from './event/TransferEvents';
 
 /**
- * TCP 传输通知回调类型——重新导出以保持向后兼容
- * 实际定义在 TCPModels.ets 中
+ * 传输就绪通知回调类型——重新导出以保持向后兼容
+ * 推荐使用 TransferNotifyCallback 替代
  */
-export { TCPNotifyCallback };
+export { TransferNotifyCallback };
 
 /**
  * 文件传输管理器类
@@ -104,13 +103,13 @@ export class FileTransferManager {
 
   /**
    * 发起文件传输
-   * 调用方通过 protocolName 显式指定协议，如需 TCP 服务器模式传输，可将 notifyCallback 嵌入 config 传入
-   * 协议内部自行处理传输全流程，FileTransferManager 层无需感知具体协议实现细节
+   * 调用方通过 protocolName 显式指定协议，协议内部自行处理传输全流程
+   * FileTransferManager 层无需感知具体协议实现细节
    * @param fileData - 文件数据
    * @param fileInfo - 文件信息
    * @param targetDevice - 目标设备标识
    * @param protocolName - 指定使用的传输协议名称（需已在 ProtocolRegistry 中注册）
-   * @param notifyCallback - TCP 服务器就绪后的通知回调，用于通知目标设备发起连接（如不使用 TCP 可不传）
+   * @param notifyCallback - 传输就绪后的通知回调，用于通知目标设备可以开始接收（可选）
    * @returns 任务 ID
    */
   async transferFile(
@@ -118,7 +117,7 @@ export class FileTransferManager {
     fileInfo: FileInfo,
     targetDevice: string,
     protocolName: string,
-    notifyCallback?: TCPNotifyCallback
+    notifyCallback?: TransferNotifyCallback
   ): Promise<string> {
     // 优先复用调用方传入的业务 taskId（fileInfo.fileId），避免重复生成导致追踪不一致
     const taskId = fileInfo.fileId && fileInfo.fileId.length > 0
@@ -151,9 +150,9 @@ export class FileTransferManager {
     let success = false;
     try {
       // 构造传输配置
-      // 对于 TCP 协议，notifyCallback 用于通知目标设备发起连接
-      // 对于 MQTT 协议，notifyCallback 会被忽略
-      const sendConfig: TCPTransferConfig = {
+      // notifyCallback 用于通知目标设备传输通道已就绪
+      // 各协议根据自身特性处理此回调
+      const sendConfig: TransferConfig = {
         chunkSize: this.defaultOptions.tcpChunkSize,
         maxRetries: this.defaultOptions.maxRetries,
         timeout: this.defaultOptions.timeout,

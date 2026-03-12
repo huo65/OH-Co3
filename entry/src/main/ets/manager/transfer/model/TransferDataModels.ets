@@ -93,3 +93,29 @@ export interface TransferOptions {
   /** TCP 监听端口，默认 8888 */
   tcpPort?: number;
 }
+
+/**
+ * 传输就绪通知信息（基础接口）
+ * 协议层准备就绪后，通过回调通知调用方传输通道已建立
+ * 这是通用接口，各协议可通过继承扩展特有字段
+ */
+export interface TransferNotifyInfo {
+  /** 任务唯一标识 */
+  taskId: string;
+  /** 协议名称（如 'TCP', 'MQTT', 'HTTP' 等） */
+  protocol: string;
+  /** 源设备标识（如 IP 地址或设备 ID） */
+  sourceDevice: string;
+  /** 目标设备标识 */
+  targetDevice?: string;
+  /** 文件元数据 */
+  fileInfo?: FileInfo;
+  /** 文件哈希值（用于校验） */
+  fileHash?: string;
+}
+
+/**
+ * 传输就绪通知回调类型（通用）
+ * 当传输协议准备就绪后调用，用于通知目标设备可以开始接收数据
+ */
+export type TransferNotifyCallback = (notifyInfo: TransferNotifyInfo) => Promise<void>;

@@ -32,6 +32,48 @@ export interface TransferConfig {
   maxRetries?: number;
   /** 分块大小（字节），用于大文件分块传输 */
   chunkSize?: number;
+  /** 传输就绪通知回调（可选） */
+  notifyCallback?: TransferNotifyCallback;
+}
+
+/**
+ * 传输就绪通知回调类型
+ * 从 TransferDataModels 重新导出，便于模块引用
+ */
+export type TransferNotifyCallback = (notifyInfo: TransferNotifyInfo) => Promise<void>;
+
+/**
+ * 传输就绪通知信息接口（基础接口）
+ * 从 TransferDataModels 重新导出，便于模块引用
+ */
+export interface TransferNotifyInfo {
+  // /** 任务唯一标识 */
+  // taskId: string;
+  // /** 协议名称 */
+  // protocol: string;
+  // /** 源设备标识 */
+  // sourceDevice: string;
+  // /** 目标设备标识 */
+  // targetDevice?: string;
+  // /** 文件元数据 */
+  // fileInfo?: FileInfo;
+  // /** 文件哈希值 */
+  // fileHash?: string;
+}
+
+/**
+ * 文件信息接口
+ * 从 TransferDataModels 重新导出，便于模块引用
+ */
+export interface FileInfo {
+  fileId: string;
+  fileName: string;
+  size: number;
+  fileType?: string;
+  filePath?: string;
+  hash?: string;
+  createdAt?: number;
+  modifiedAt?: number;
 }
 
 /**
