@@ -196,12 +196,39 @@ export class TCPTransferProtocol implements CapableProtocolInterface {
 
   /**
    * 断开连接
+   * 关闭所有 TCP 连接并停止服务器
+   * 发送端：停止服务器（同时关闭所有客户端连接）
+   * 接收端：关闭客户端连接
    */
   async disconnect(): Promise<TransferResult<boolean>> {
     console.info('[TCPTransferProtocol] 断开所有连接');
 
     try {
-      await this.socketManager.stopServer();
+      // 获取所有活动连接并关闭
+      const connectionIds = this.socketManager.getConnectionIds();
+      if (connectionIds.length > 0) {
+        console.info(`[TCPTransferProtocol] 关闭 ${connectionIds.length} 个活动连接`);
+        for (const connectionId of connectionIds) {
+          try {
+            await this.socketManager.closeConnection(connectionId);
+          } catch (closeError) {
+            console.warn(`[TCPTransferProtocol] 关闭连接 ${connectionId} 失败:`, closeError);
+          }
+        }
+      }
+
+      // 停止服务器（如果正在运行）
+      if (this.socketManager.isServerListening()) {
+        await this.socketManager.stopServer();
+      }
+
+      // 清理所有状态
+      this.progressMap.clear();
+      this.chunkBuffers.clear();
+      this.receiveStates.clear();
+      this.sendStates.clear();
+
+      console.info('[TCPTransferProtocol] 所有连接已断开，资源已释放');
       return createSuccessResult('disconnect', true);
     } catch (error) {
       console.error('[TCPTransferProtocol] 断开连接失败:', error);

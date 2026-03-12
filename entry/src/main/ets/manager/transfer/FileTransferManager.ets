@@ -270,6 +270,19 @@ export class FileTransferManager {
         transferError.details,
         transferError.cause
       );
+    } finally {
+      // 传输完成后断开连接，释放资源
+      // 对于 TCP 等需要长连接的协议，这一步尤为重要
+      try {
+        const disconnectResult = await protocol.disconnect();
+        if (disconnectResult.success) {
+          console.info(`[FileTransferManager] 连接已断开，taskId=${taskId}, protocol=${protocolName}`);
+        } else {
+          console.warn(`[FileTransferManager] 断开连接失败，taskId=${taskId}, error=${disconnectResult.error?.message}`);
+        }
+      } catch (disconnectError) {
+        console.warn('[FileTransferManager] 断开连接时发生异常:', disconnectError);
+      }
     }
   }
 
@@ -399,6 +412,19 @@ export class FileTransferManager {
         transferError.details,
         transferError.cause
       );
+    } finally {
+      // 接收完成后断开连接，释放资源
+      // 对于 TCP 等需要长连接的协议，这一步尤为重要
+      try {
+        const disconnectResult = await protocol.disconnect();
+        if (disconnectResult.success) {
+          console.info(`[FileTransferManager] 连接已断开，taskId=${taskId}, protocol=${protocolName}`);
+        } else {
+          console.warn(`[FileTransferManager] 断开连接失败，taskId=${taskId}, error=${disconnectResult.error?.message}`);
+        }
+      } catch (disconnectError) {
+        console.warn('[FileTransferManager] 断开连接时发生异常:', disconnectError);
+      }
     }
   }
 

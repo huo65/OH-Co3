@@ -240,7 +240,6 @@ class TaskDispatch{
           fileInfo,
           protocolName
         );
-        // TODO 注销连接
 
         // 将接收到的文件数据还原到任务参数
         if (fileResult.success && fileResult.data instanceof ArrayBuffer) {
