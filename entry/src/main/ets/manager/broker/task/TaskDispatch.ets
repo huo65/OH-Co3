@@ -111,7 +111,7 @@ class TaskDispatch{
    * @param taskInfo - 待发送的完整任务传输数据
    * @returns 发送是否成功
    */
-  // TODO 目前先基于TCP调通，后续扩展纯接口实现
+  // TODO 目前先基于TCP调通，后续扩展纯接口实现　：notifyCallback
   async sendTask(taskInfo: TaskTransmitData): Promise<boolean> {
     const MQTTInstance: MQTTClient = MQTTClient.getInstance();
     try {
@@ -119,9 +119,7 @@ class TaskDispatch{
       console.info(`[TaskDispatch] 估算数据大小：dataSize=${dataSize}`);
 
       if (dataSize > this.fileSizeThreshold) {
-        // 大文件：显式指定 TCP 协议，委托 FileTransferManager 处理
         console.info(`[TaskDispatch] 大文件传输，显式指定 TCP 协议，taskId=${taskInfo.taskId}`);
-
         // 将任务数据转换为传输用的 ArrayBuffer
         const fileData = this.extractFileData(taskInfo.params);
         if (!fileData) {
@@ -195,19 +193,20 @@ class TaskDispatch{
    * @returns 数据大小（字节）
    */
   private estimateDataSize(task: InferenceTask): number {
-    // 简单估算：根据 imageData 或其他数据字段的大小 TODO 优化估算
+    // 简单估算：根据 imageData 或其他数据字段的大小
     console.info(`[TaskDispatch] 文件类型 type=${task.type}`);
     if (task.type === InferenceInputType.IMAGE) {
       const imageDataObj: ImageInputData = task.data as ImageInputData;
       const imageData: string = imageDataObj.imageData || '';
       return imageData.length;
     }
-    // TODO其他类型可以进一步扩展
+    // TODO　封装一个通用工具类
     return 0;
   }
 
   /**
-   * 解析接收到的任务消息并处理 TODO接收文件扩展
+   * 解析接收到的任务消息并处理
+   * TODO接收文件扩展
    * - 直接传输（direct）：直接执行本地推理
    * - TCP 大文件传输（tcp）：委托 FileTransferManager 建立连接并接收文件，再执行推理
    * @param message - 接收到的任务消息 JSON 字符串

@@ -34,7 +34,7 @@ export interface MQTTConfig {
 
 // 系统状态类型
 export interface SystemStatus {
-  ownDevice: HashMap<string, DeviceInfo>;       // 当前设备状态
+  ownDevice:  DeviceInfo;       // 当前设备状态
   otherDevices: HashMap<string, DeviceInfo>;  // 其他设备状态（通过通信模块同步）
   allDevices: HashMap<string, DeviceInfo>;    // 所有设备状态（当前设备+其他设备）
 }
@@ -58,7 +58,8 @@ class HarmonyInferenceClient {
   // 默认图像识别模型
   private defaultWorker: ModelManager;
   private isInitialized: boolean = false;
-  private modelName: string = '';
+  // 在类中添加定时器ID的成员变量
+  private syncIntervalId: number | null = null;
   //TODO 后续拓展任务状态监控（放在Schedule
   private taskStatusMap: Map<string, TaskStatus> = new Map();
 
@@ -179,12 +180,11 @@ class HarmonyInferenceClient {
 
       // 初始化模型
       await this.worker.initModel(modelName);
-      this.modelName = modelName;
 
       // 初始化全局任务队列
       GlobalTaskManager.init(this.worker);
 
-      // 启动设备状态同步 TODO 停止同步
+      // 启动设备状态同步
       this.startDeviceStatusSync();
 
       this.isInitialized = true;
@@ -201,6 +201,8 @@ class HarmonyInferenceClient {
     }
 
     try {
+      this.stopDeviceStatusSync();
+
       // 关闭MQTT连接
       if (this.mqttClient) {
         await this.mqttClient.destroy();
@@ -214,6 +216,7 @@ class HarmonyInferenceClient {
 
       // 移除事件监听器
       emitter.off(RESULT_EVENT_ID);
+
 
       this.isInitialized = false;
       console.info('HarmonyInferenceClient destroyed successfully');
@@ -241,22 +244,36 @@ class HarmonyInferenceClient {
     // 设备状态同步由SystemProfiler和NodeInfoSyn模块自动处理
     // 这里不需要额外的代码，只需要确保这些模块正常工作
     console.info('Device status sync started');
-
-    // 定期更新设备状态
-    setInterval(() => {
+    // 检查是否已存在定时器
+    if (this.syncIntervalId !== null) {
+      console.warn('Device status sync is already running');
+      return;
+    }
+    // 启动定时器并保存ID
+    this.syncIntervalId = setInterval(() => {
       this.updateDeviceStatus();
-    }, 10000); // 每10秒更新一次
+    }, 10000);
+  }
+  // 新增：关闭设备状态同步方法
+  private stopDeviceStatusSync(): void {
+    if (this.syncIntervalId !== null) {
+      clearInterval(this.syncIntervalId); // 清除定时任务
+      this.syncIntervalId = null;         // 重置ID
+      console.info('Device status sync stopped');
+    } else {
+      console.warn('No active device status sync found');
+    }
   }
 
   // 更新设备状态并通知回调
   private updateDeviceStatus(): void {
-    const status = this.getSystemStatus();
+     this.getSystemStatus();
   }
   // 获取全局系统状态视图
   public getSystemStatus(): SystemStatus {
 
     const allDevicesMap = systemProfiler.getDeviceInfos();
-    const ownInfo = systemProfiler.getOwnInfo();
+    const ownInfo = systemProfiler.ownInfo
     const otherDevicesMap =systemProfiler.getOtherInfo();
 
     return {

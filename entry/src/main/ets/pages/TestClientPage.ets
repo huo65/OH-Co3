@@ -115,7 +115,7 @@ export struct TestClientPage {
         Text(this.testResult).width('100%').backgroundColor('#f0f0f0').padding(10)
       }
       
-      // 销毁客户端按钮 TODO 结束的时候状态监控也停止
+      // 销毁客户端按钮
       Button('Destroy Client')
         .onClick(async () => {
           await this.client.destroy();
@@ -154,7 +154,6 @@ export struct TestClientPage {
       const rawFileContent: Uint8Array = await resMgr.getRawFileContent("mobilenetv2.ms");
       return rawFileContent;
     } catch (error) {
-      // TODO: Implement error handling.
       console.info(`[TestPage] 测试页面 error=${error}`);
     }
     return new Uint8Array;

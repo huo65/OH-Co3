@@ -160,7 +160,7 @@ class NodeInfoSyn{
         let latency = newTimepStamp - timeStamp;
         this.lastLatency = latency;
       } else {
-        // TODO 后期清理无用日志
+        // TODO 统一日志格式处理，规范格式
         console.log("huoNO");
       }
     } catch (e) {
