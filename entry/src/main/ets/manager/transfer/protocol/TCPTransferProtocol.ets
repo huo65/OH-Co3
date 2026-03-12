@@ -2,9 +2,16 @@
  * TCP 文件传输协议实现
  * 基于 TCP Socket，处理大文件（>2MB）的分块传输
  */
-import { TransferProtocolInterface, TransferConfig, TransferState, TransferProgress } from '../protocol/TransferProtocolInterface';
+import {
+  TransferProtocolInterface,
+  TransferConfig,
+  TransferState,
+  TransferProgress,
+  CapableProtocolInterface,
+  ProtocolCapabilities
+} from '../protocol/TransferProtocolInterface';
 import { FileTransferSocketManager, MessageCallback } from '../socket/FileTransferSocketManager';
-import { ChunkData, FileInfo } from '../model/TransferDataModels';
+import { ChunkData, FileInfo, TransferNotifyInfo } from '../model/TransferDataModels';
 import {
   TCPNotifyInfo,
   TCPMessageType,
@@ -18,6 +25,15 @@ import {
 import { FileUtils } from '../utils/FileUtils';
 import { TransferEventManager, TransferEventId } from '../event/TransferEvents';
 import { NetworkUtils } from '../utils/NetworkUtils';
+import {
+  TransferResult,
+  TransferErrorCode,
+  createSuccessResult,
+  createErrorResult,
+  errorFromException,
+  createTransferError
+} from '../model/TransferResult';
+import { sleep, generateUniqueId, calculateSpeed, calculateEstimatedTime } from '../utils/CommonUtils';
 
 /**
  * 接收状态信息
@@ -33,21 +49,56 @@ interface ReceiveState {
   resolve?: (chunks: ChunkData[]) => void;
   reject?: (error: Error) => void;
   timeoutId?: number;
+  startTime: number;
+  lastProgressTime: number;
 }
 
-export class TCPTransferProtocol implements TransferProtocolInterface {
+/**
+ * 发送状态信息
+ */
+interface SendState {
+  taskId: string;
+  fileInfo: FileInfo;
+  totalChunks: number;
+  sentChunks: number;
+  fileHash: string;
+  startTime: number;
+  lastProgressTime: number;
+  connectionId: string | null;
+}
+
+/**
+ * TCP 协议能力定义
+ */
+const TCP_CAPABILITIES: ProtocolCapabilities = {
+  supportsLargeFiles: true,
+  maxFileSize: 0, // 无限制
+  supportsChunking: true,
+  defaultChunkSize: 128 * 1024, // 128KB
+  supportsResume: false,
+  supportsProgress: true,
+  supportsCancellation: true,
+  requiresActiveConnection: true
+};
+
+/**
+ * TCP 文件传输协议实现类
+ */
+export class TCPTransferProtocol implements CapableProtocolInterface {
   private socketManager: FileTransferSocketManager;
   private eventManager: TransferEventManager;
   private progressMap: Map<string, TransferProgress> = new Map();
-  private chunkBuffers: Map<string, ChunkData[]> = new Map(); // 接收分块缓存
-  private receiveStates: Map<string, ReceiveState> = new Map(); // 接收状态管理
+  private chunkBuffers: Map<string, ChunkData[]> = new Map();
+  private receiveStates: Map<string, ReceiveState> = new Map();
+  private sendStates: Map<string, SendState> = new Map();
 
   // 配置参数
   private readonly DEFAULT_CHUNK_SIZE = 128 * 1024; // 128KB
-  private readonly DEFAULT_TIMEOUT = 30000; // 30 秒
-  private readonly MAX_RETRIES = 3; // 最多重试 3 次
-  private readonly DEFAULT_PORT = 8888; // 默认监听端口
-  private readonly RECEIVE_TIMEOUT = 300000; // 接收超时 5 分钟
+  private readonly DEFAULT_TIMEOUT = 30000; // 30秒
+  private readonly MAX_RETRIES = 3;
+  private readonly DEFAULT_PORT = 8888;
+  private readonly RECEIVE_TIMEOUT = 300000; // 5分钟
+  private readonly CONNECTION_WAIT_TIMEOUT = 30000; // 30秒
 
   constructor() {
     this.socketManager = FileTransferSocketManager.getInstance();
@@ -62,66 +113,100 @@ export class TCPTransferProtocol implements TransferProtocolInterface {
   }
 
   /**
-   * 连接到远程设备（作为客户端）
-   * @param host - 远程主机 IP
-   * @param port - 远程端口
-   * @param config - 传输配置
+   * 获取协议能力信息
    */
-  async connect(host: string, port: number = this.DEFAULT_PORT, config?: TransferConfig): Promise<boolean> {
+  getCapabilities(): ProtocolCapabilities {
+    const result: ProtocolCapabilities = {
+      supportsLargeFiles: TCP_CAPABILITIES.supportsLargeFiles,
+      maxFileSize: TCP_CAPABILITIES.maxFileSize,
+      supportsChunking: TCP_CAPABILITIES.supportsChunking,
+      defaultChunkSize: TCP_CAPABILITIES.defaultChunkSize,
+      supportsResume: TCP_CAPABILITIES.supportsResume,
+      supportsProgress: TCP_CAPABILITIES.supportsProgress,
+      supportsCancellation: TCP_CAPABILITIES.supportsCancellation,
+      requiresActiveConnection: TCP_CAPABILITIES.requiresActiveConnection
+    };
+    return result;
+  }
+
+  /**
+   * 连接到远程设备（作为客户端）
+   */
+  async connect(host: string, port: number = this.DEFAULT_PORT, config?: TransferConfig): Promise<TransferResult<boolean>> {
     try {
       const timeout = config?.timeout || this.DEFAULT_TIMEOUT;
-      
+
       console.info(`[TCPTransferProtocol] 开始连接到 ${host}:${port}`);
-      
+
       const connectionId = await this.socketManager.connectToServer(host, port, timeout);
-      
+
       if (connectionId) {
         console.info(`[TCPTransferProtocol] 连接成功，connectionId=${connectionId}`);
-        return true;
+        return createSuccessResult('connect', true);
       } else {
         console.error('[TCPTransferProtocol] 连接失败');
-        return false;
+        return createErrorResult(
+          'connect',
+          TransferErrorCode.CONNECTION_FAILED,
+          `无法连接到 ${host}:${port}`
+        );
       }
     } catch (error) {
       console.error('[TCPTransferProtocol] 连接异常:', error);
-      return false;
+      return createErrorResult(
+        'connect',
+        TransferErrorCode.CONNECTION_FAILED,
+        `连接异常: ${error instanceof Error ? error.message : String(error)}`
+      );
     }
   }
 
   /**
    * 启动服务器监听（作为服务端）
-   * @param host - 本机 IP（可选）
-   * @param port - 监听端口
-   * @param config - 传输配置
    */
-  async startServer(port: number = this.DEFAULT_PORT, config?: TransferConfig): Promise<boolean> {
+  async startServer(port: number = this.DEFAULT_PORT): Promise<TransferResult<boolean>> {
     try {
       console.info(`[TCPTransferProtocol] 启动服务器监听，端口=${port}`);
       const result = await this.socketManager.startServer(port);
-      
+
       if (result) {
         console.info('[TCPTransferProtocol] 服务器启动成功');
-        return true;
+        return createSuccessResult('startServer', true);
       } else {
         console.error('[TCPTransferProtocol] 服务器启动失败');
-        return false;
+        return createErrorResult(
+          'startServer',
+          TransferErrorCode.SERVER_START_FAILED,
+          `服务器启动失败，端口=${port}`
+        );
       }
     } catch (error) {
       console.error('[TCPTransferProtocol] 服务器启动异常:', error);
-      return false;
+      return createErrorResult(
+        'startServer',
+        TransferErrorCode.SERVER_START_FAILED,
+        `服务器启动异常: ${error instanceof Error ? error.message : String(error)}`
+      );
     }
   }
 
   /**
    * 断开连接
    */
-  async disconnect(): Promise<boolean> {
+  async disconnect(): Promise<TransferResult<boolean>> {
     console.info('[TCPTransferProtocol] 断开所有连接');
-    
-    // 停止服务器
-    await this.socketManager.stopServer();
-    
-    return true;
+
+    try {
+      await this.socketManager.stopServer();
+      return createSuccessResult('disconnect', true);
+    } catch (error) {
+      console.error('[TCPTransferProtocol] 断开连接失败:', error);
+      return createErrorResult(
+        'disconnect',
+        TransferErrorCode.UNKNOWN_ERROR,
+        `断开连接失败: ${error instanceof Error ? error.message : String(error)}`
+      );
+    }
   }
 
   /**
@@ -133,14 +218,10 @@ export class TCPTransferProtocol implements TransferProtocolInterface {
 
   /**
    * 发送文件数据（支持分块传输）
-   * TCP 作为发送端的完整流程：启动服务器 → 通知目标设备（config.notifyCallback）→ 等待连接 → 分块发送
-   * @param data - 文件数据
-   * @param taskId - 任务 ID
-   * @param config - 传输配置，config.notifyCallback 用于通知目标设备发起 TCP 连接
    */
-  async send(data: ArrayBuffer | string, taskId: string, config?: TransferConfig): Promise<boolean> {
+  async send(data: ArrayBuffer | string, taskId: string, config?: TransferConfig): Promise<TransferResult<boolean>> {
     try {
-      // 如果是字符串，先转换为 ArrayBuffer
+      // 转换数据格式
       let fileData: ArrayBuffer;
       if (typeof data === 'string') {
         fileData = FileUtils.stringToArrayBuffer(data);
@@ -152,83 +233,114 @@ export class TCPTransferProtocol implements TransferProtocolInterface {
       const maxRetries = config?.maxRetries || this.MAX_RETRIES;
       const port = this.DEFAULT_PORT;
 
-      // 启动 TCP 服务器监听，等待目标设备主动连接
+      // 启动 TCP 服务器
       if (!this.isConnected()) {
-        const serverStarted = await this.startServer(port);
-        if (!serverStarted) {
-          throw new Error(`TCP 服务器启动失败，端口=${port}`);
+        const serverResult = await this.startServer(port);
+        if (!serverResult.success) {
+          return createErrorResult(
+            taskId,
+            TransferErrorCode.SERVER_START_FAILED,
+            `TCP 服务器启动失败，端口=${port}`
+          );
         }
       }
 
-      // 服务器就绪，通知目标设备发起连接
+      // 通知目标设备
       if (config?.notifyCallback) {
-        const fileInfo: FileInfo = {
+        const fileInfo: FileInfo = config.fileInfo || {
           fileId: taskId,
           fileName: `file_${taskId}`,
           size: fileData.byteLength
         };
+
         const notifyInfo: TCPNotifyInfo = {
+          taskId,
+          protocol: 'TCP',
+          sourceDevice: NetworkUtils.getIpAddress(),
+          fileInfo,
           sourceIp: NetworkUtils.getIpAddress(),
           port: port,
+          timestamp: 0
         };
+
         await config.notifyCallback(notifyInfo);
         console.info(`[TCPTransferProtocol] 已通知目标设备发起 TCP 连接，taskId=${taskId}`);
       } else {
         console.warn(`[TCPTransferProtocol] 未提供 notifyCallback，目标设备可能无法得知需要发起连接`);
       }
-      
+
       // 计算文件哈希
       const fileHash = await FileUtils.calculateHash(fileData);
-      
+
       // 分块
       const chunks = FileUtils.chunkFile(fileData, chunkSize, taskId);
       console.info(`[TCPTransferProtocol] 文件分块完成，总块数=${chunks.length}, 大小=${fileData.byteLength}字节`);
-      
+
+      // 初始化发送状态
+      const sendState: SendState = {
+        taskId,
+        fileInfo: config?.fileInfo || { fileId: taskId, fileName: `file_${taskId}`, size: fileData.byteLength },
+        totalChunks: chunks.length,
+        sentChunks: 0,
+        fileHash,
+        startTime: Date.now(),
+        lastProgressTime: Date.now(),
+        connectionId: null
+      };
+      this.sendStates.set(taskId, sendState);
+
       // 更新进度为传输中
-      this.updateProgress(taskId, TransferState.TRANSFERRING, 0);
-      
-      // 等待客户端连接（最多等待 30 秒）
+      this.updateProgress(taskId, TransferState.TRANSFERRING, 0, 0, fileData.byteLength);
+
+      // 等待客户端连接
       let connectionId: string | null = null;
       let waitTime = 0;
-      while (waitTime < 30000) {
+      while (waitTime < this.CONNECTION_WAIT_TIMEOUT) {
         const connectionIds = this.socketManager.getConnectionIds();
         if (connectionIds.length > 0) {
           connectionId = connectionIds[0];
           break;
         }
-        await this.sleep(100);
+        await sleep(100);
         waitTime += 100;
       }
 
       if (!connectionId) {
-        throw new Error('等待客户端连接超时');
+        return createErrorResult(
+          taskId,
+          TransferErrorCode.CONNECTION_TIMEOUT,
+          '等待客户端连接超时'
+        );
       }
 
+      sendState.connectionId = connectionId;
       console.info(`[TCPTransferProtocol] 客户端已连接，connectionId=${connectionId}`);
 
-      // 发送握手消息（包含文件信息）
+      // 发送握手消息
       const handshakeMessage: TCPHandshakeMessage = {
         type: TCPMessageType.HANDSHAKE,
         taskId,
-        fileInfo: { fileId: taskId, fileName: `file_${taskId}`, size: fileData.byteLength },
+        fileInfo: sendState.fileInfo,
         totalChunks: chunks.length,
         chunkSize,
         fileHash
       };
-      const handshakeResult = await this.sendTCPMessage(connectionId, handshakeMessage);
 
-      if (!handshakeResult) {
-        throw new Error('握手消息发送失败');
+      const handshakeResult = await this.sendTCPMessage(connectionId, handshakeMessage);
+      if (!handshakeResult.success) {
+        return createErrorResult(
+          taskId,
+          TransferErrorCode.TCP_HANDSHAKE_FAILED,
+          '握手消息发送失败'
+        );
       }
 
       console.info(`[TCPTransferProtocol] 握手消息已发送，等待分块确认...`);
 
-      // 逐块发送文件数据
-      let sentChunks = 0;
+      // 逐块发送
       for (let i = 0; i < chunks.length; i++) {
         const chunk = chunks[i];
 
-        // 构建分块消息
         const chunkMessage: TCPChunkMessage = {
           type: TCPMessageType.CHUNK,
           taskId,
@@ -240,27 +352,41 @@ export class TCPTransferProtocol implements TransferProtocolInterface {
         // 重试机制
         let success = false;
         for (let retry = 0; retry < maxRetries; retry++) {
-          success = await this.sendTCPMessage(connectionId, chunkMessage);
-          if (success) break;
+          const result = await this.sendTCPMessage(connectionId, chunkMessage);
+          if (result.success) {
+            success = true;
+            break;
+          }
 
           console.warn(`[TCPTransferProtocol] 分块 ${i} 发送失败，重试 (${retry + 1}/${maxRetries})`);
-          await this.sleep(500 * (retry + 1));
+          await sleep(500 * (retry + 1));
         }
 
         if (!success) {
-          throw new Error(`分块 ${i} 发送失败，超过最大重试次数`);
+          return createErrorResult(
+            taskId,
+            TransferErrorCode.CHUNK_SEND_FAILED,
+            `分块 ${i} 发送失败，超过最大重试次数`
+          );
         }
 
-        sentChunks++;
-        const progress = Math.round((sentChunks / chunks.length) * 100);
-        this.updateProgress(taskId, TransferState.TRANSFERRING, progress);
+        sendState.sentChunks++;
+        const progress = Math.round((sendState.sentChunks / chunks.length) * 100);
+        const now = Date.now();
+        const speed = calculateSpeed(
+          (i + 1) * chunkSize,
+          now - sendState.startTime
+        );
+        const estimatedTime = calculateEstimatedTime(
+          (i + 1) * chunkSize,
+          fileData.byteLength,
+          now - sendState.startTime
+        );
+
+        this.updateProgress(taskId, TransferState.TRANSFERRING, progress, (i + 1) * chunkSize, fileData.byteLength, speed, estimatedTime);
 
         // 触发分块接收事件
-        this.eventManager.emit(
-          TransferEventId.CHUNK_RECEIVED,
-          taskId,
-          `${i}/${chunks.length}`
-        );
+        this.eventManager.emit(TransferEventId.CHUNK_RECEIVED, taskId, `${i}/${chunks.length}`);
       }
 
       // 发送完成消息
@@ -270,26 +396,35 @@ export class TCPTransferProtocol implements TransferProtocolInterface {
         fileHash
       };
       await this.sendTCPMessage(connectionId, completeMessage);
-      
+
       // 更新进度为完成
-      this.updateProgress(taskId, TransferState.COMPLETED, 100);
-      
+      this.updateProgress(taskId, TransferState.COMPLETED, 100, fileData.byteLength, fileData.byteLength);
+
+      // 清理发送状态
+      this.sendStates.delete(taskId);
+
       console.info(`[TCPTransferProtocol] 文件发送完成，taskId=${taskId}`);
-      return true;
+      return createSuccessResult(taskId, true);
     } catch (error) {
-      // TODO 错误消息返回客户端
-      console.error('[TCPTransferProtocol] 文件发送失败:', error);
-      this.updateProgress(taskId, TransferState.FAILED, 0, JSON.stringify(error));
-      return false;
+      const transferError = errorFromException(error, TransferErrorCode.TRANSFER_FAILED);
+      console.error('[TCPTransferProtocol] 文件发送失败:', transferError.message);
+      this.updateProgress(taskId, TransferState.FAILED, 0, 0, 0, undefined, undefined, transferError.message);
+      this.sendStates.delete(taskId);
+
+      return createErrorResult(
+        taskId,
+        transferError.code,
+        transferError.message,
+        transferError.details,
+        transferError.cause
+      );
     }
   }
 
   /**
    * 接收文件数据
-   * @param taskId - 任务 ID
-   * @returns 接收到的完整数据
    */
-  async receive(taskId: string): Promise<ArrayBuffer | string> {
+  async receive(taskId: string): Promise<TransferResult<ArrayBuffer | string>> {
     try {
       console.info(`[TCPTransferProtocol] 开始接收文件，taskId=${taskId}`);
 
@@ -306,7 +441,11 @@ export class TCPTransferProtocol implements TransferProtocolInterface {
       this.socketManager.unregisterMessageCallback(taskId);
 
       if (!chunks || chunks.length === 0) {
-        throw new Error('未接收到任何分块');
+        return createErrorResult(
+          taskId,
+          TransferErrorCode.RECEIVE_FAILED,
+          '未接收到任何分块'
+        );
       }
 
       // 重组文件
@@ -317,29 +456,40 @@ export class TCPTransferProtocol implements TransferProtocolInterface {
       if (receiveState && receiveState.fileHash) {
         const receivedHash = await FileUtils.calculateHash(fileData);
         if (receivedHash !== receiveState.fileHash) {
-          throw new Error('文件哈希校验失败');
+          return createErrorResult(
+            taskId,
+            TransferErrorCode.FILE_HASH_MISMATCH,
+            '文件哈希校验失败',
+            `期望: ${receiveState.fileHash.substring(0, 16)}..., 实际: ${receivedHash.substring(0, 16)}...`
+          );
         }
         console.info(`[TCPTransferProtocol] 文件哈希校验通过，哈希=${receivedHash.substring(0, 16)}...`);
       }
 
       // 更新进度为完成
-      this.updateProgress(taskId, TransferState.COMPLETED, 100);
+      this.updateProgress(taskId, TransferState.COMPLETED, 100, fileData.byteLength, fileData.byteLength);
 
       // 清理接收状态
       this.receiveStates.delete(taskId);
       this.chunkBuffers.delete(taskId);
 
-      return fileData;
+      return createSuccessResult(taskId, fileData);
     } catch (error) {
-      const errMsg: string = error instanceof Error ? error.message : String(error);
-      console.error('[TCPTransferProtocol] 文件接收失败:', errMsg);
-      this.updateProgress(taskId, TransferState.FAILED, 0, errMsg);
+      const transferError = errorFromException(error, TransferErrorCode.RECEIVE_FAILED);
+      console.error('[TCPTransferProtocol] 文件接收失败:', transferError.message);
+      this.updateProgress(taskId, TransferState.FAILED, 0, 0, 0, undefined, undefined, transferError.message);
 
       // 清理资源
       this.socketManager.unregisterMessageCallback(taskId);
       this.receiveStates.delete(taskId);
 
-      throw new Error(errMsg);
+      return createErrorResult(
+        taskId,
+        transferError.code,
+        transferError.message,
+        transferError.details,
+        transferError.cause
+      );
     }
   }
 
@@ -363,14 +513,22 @@ export class TCPTransferProtocol implements TransferProtocolInterface {
   /**
    * 取消传输任务
    */
-  async cancel(taskId: string): Promise<boolean> {
+  async cancel(taskId: string): Promise<TransferResult<boolean>> {
     console.info(`[TCPTransferProtocol] 取消传输任务：${taskId}`);
-    
+
     // 清理该任务的缓存
     this.chunkBuffers.delete(taskId);
-    
-    this.updateProgress(taskId, TransferState.CANCELLED, 0);
-    return true;
+    this.sendStates.delete(taskId);
+
+    const receiveState = this.receiveStates.get(taskId);
+    if (receiveState && receiveState.reject) {
+      receiveState.reject(new Error('传输已取消'));
+    }
+    this.receiveStates.delete(taskId);
+
+    this.updateProgress(taskId, TransferState.CANCELLED, 0, 0, 0);
+
+    return createSuccessResult(taskId, true);
   }
 
   /**
@@ -384,7 +542,9 @@ export class TCPTransferProtocol implements TransferProtocolInterface {
       receivedChunks: 0,
       chunks: [],
       fileHash: '',
-      isComplete: false
+      isComplete: false,
+      startTime: Date.now(),
+      lastProgressTime: Date.now()
     };
     this.receiveStates.set(taskId, receiveState);
     this.chunkBuffers.set(taskId, []);
@@ -442,7 +602,6 @@ export class TCPTransferProtocol implements TransferProtocolInterface {
 
   /**
    * 解析 TCP 消息
-   * 消息格式：前 4 字节为 JSON 头部长度，后面是 JSON 数据
    */
   private parseTCPMessage(data: ArrayBuffer): TCPMessage | null {
     try {
@@ -450,18 +609,15 @@ export class TCPTransferProtocol implements TransferProtocolInterface {
         return null;
       }
 
-      // 读取头部长度
       const headerLengthView = new DataView(data, 0, 4);
-      const headerLength = headerLengthView.getInt32(0, false); // 大端序
+      const headerLength = headerLengthView.getInt32(0, false);
 
       if (headerLength <= 0 || headerLength > data.byteLength - 4) {
         console.error(`[TCPTransferProtocol] 无效的消息头长度：${headerLength}`);
         return null;
       }
 
-      // 解析 JSON 头部
       const headerBytes = new Uint8Array(data, 4, headerLength);
-      // 创建一个新的 ArrayBuffer 拷贝，只包含头部数据
       const headerBuffer = new ArrayBuffer(headerLength);
       new Uint8Array(headerBuffer).set(headerBytes);
       const headerJson = FileUtils.arrayBufferToString(headerBuffer);
@@ -477,18 +633,13 @@ export class TCPTransferProtocol implements TransferProtocolInterface {
   /**
    * 序列化并发送 TCP 消息
    */
-  private async sendTCPMessage(connectionId: string, message: TCPMessage): Promise<boolean> {
+  private async sendTCPMessage(connectionId: string, message: TCPMessage): Promise<TransferResult<boolean>> {
     try {
-      // 构建消息头部（分块消息的数据单独处理，不包含在 JSON 中）
       let messageToSend: TCPMessage = message;
-      let dataBytes: ArrayBuffer | null = null;
 
       if (message.type === TCPMessageType.CHUNK) {
         const chunkMessage = message as TCPChunkMessage;
-        // 分块消息：将数据转为 Base64 放入 JSON，避免二进制序列化问题
-        // 确保 data 是 ArrayBuffer 类型
         if (typeof chunkMessage.data !== 'string') {
-          dataBytes = chunkMessage.data;
           messageToSend = {
             type: chunkMessage.type,
             taskId: chunkMessage.taskId,
@@ -499,26 +650,35 @@ export class TCPTransferProtocol implements TransferProtocolInterface {
         }
       }
 
-      // 序列化消息头部
       const headerJson = JSON.stringify(messageToSend);
       const headerBytes = FileUtils.stringToArrayBuffer(headerJson);
 
-      // 构建完整消息：4 字节头部长度 + JSON 头部
       const totalLength = 4 + headerBytes.byteLength;
       const fullMessage = new ArrayBuffer(totalLength);
       const fullView = new Uint8Array(fullMessage);
 
-      // 写入头部长度（大端序）
       const lengthView = new DataView(fullMessage, 0, 4);
       lengthView.setInt32(0, headerBytes.byteLength, false);
 
-      // 写入头部
       fullView.set(new Uint8Array(headerBytes), 4);
 
-      return await this.socketManager.sendData(connectionId, fullMessage);
+      const success = await this.socketManager.sendData(connectionId, fullMessage);
+      if (success) {
+        return createSuccessResult(message.taskId || 'send', true);
+      } else {
+        return createErrorResult(
+          message.taskId || 'send',
+          TransferErrorCode.SEND_FAILED,
+          '消息发送失败'
+        );
+      }
     } catch (error) {
       console.error('[TCPTransferProtocol] 消息发送失败:', error);
-      return false;
+      return createErrorResult(
+        message.taskId || 'send',
+        TransferErrorCode.SEND_FAILED,
+        `消息发送异常: ${error instanceof Error ? error.message : String(error)}`
+      );
     }
   }
 
@@ -535,8 +695,7 @@ export class TCPTransferProtocol implements TransferProtocolInterface {
 
     console.info(`[TCPTransferProtocol] 握手消息已接收，taskId=${taskId}, totalChunks=${message.totalChunks}`);
 
-    // 更新进度
-    this.updateProgress(taskId, TransferState.TRANSFERRING, 0);
+    this.updateProgress(taskId, TransferState.TRANSFERRING, 0, 0, message.fileInfo.size);
   }
 
   /**
@@ -546,17 +705,13 @@ export class TCPTransferProtocol implements TransferProtocolInterface {
     const receiveState = this.receiveStates.get(taskId);
     if (!receiveState) return;
 
-    // 解析分块数据（可能是 Base64 字符串或 ArrayBuffer）
     let chunkData: ArrayBuffer;
     if (typeof message.data === 'string') {
-      // Python 端发送的是 Base64 字符串
       chunkData = FileUtils.base64ToArrayBuffer(message.data);
     } else {
-      // ETS 端内部传递的是 ArrayBuffer
       chunkData = message.data;
     }
 
-    // 创建分块数据
     const chunk: ChunkData = {
       taskId,
       chunkIndex: message.chunkIndex,
@@ -566,20 +721,36 @@ export class TCPTransferProtocol implements TransferProtocolInterface {
       isLastChunk: message.isLastChunk
     };
 
-    // 缓存分块
     receiveState.chunks.push(chunk);
     receiveState.receivedChunks++;
 
-    // 更新缓存
     this.chunkBuffers.set(taskId, receiveState.chunks);
 
-    // 更新进度
     const progress = receiveState.totalChunks > 0
       ? Math.round((receiveState.receivedChunks / receiveState.totalChunks) * 100)
       : 0;
-    this.updateProgress(taskId, TransferState.TRANSFERRING, progress);
 
-    // 触发分块接收事件
+    const now = Date.now();
+    const speed = calculateSpeed(
+      receiveState.receivedChunks * chunkData.byteLength,
+      now - receiveState.startTime
+    );
+    const estimatedTime = calculateEstimatedTime(
+      receiveState.receivedChunks * chunkData.byteLength,
+      receiveState.fileInfo.size,
+      now - receiveState.startTime
+    );
+
+    this.updateProgress(
+      taskId,
+      TransferState.TRANSFERRING,
+      progress,
+      receiveState.receivedChunks * chunkData.byteLength,
+      receiveState.fileInfo.size,
+      speed,
+      estimatedTime
+    );
+
     this.eventManager.emit(
       TransferEventId.CHUNK_RECEIVED,
       taskId,
@@ -601,7 +772,6 @@ export class TCPTransferProtocol implements TransferProtocolInterface {
 
     console.info(`[TCPTransferProtocol] 完成消息已接收，taskId=${taskId}`);
 
-    // 解析 Promise
     if (receiveState.resolve) {
       receiveState.resolve(receiveState.chunks);
     }
@@ -630,17 +800,14 @@ export class TCPTransferProtocol implements TransferProtocolInterface {
         return;
       }
 
-      // 如果已经完成，直接返回
       if (receiveState.isComplete) {
         resolve(receiveState.chunks);
         return;
       }
 
-      // 保存 resolve/reject 以便异步回调中使用
       receiveState.resolve = resolve;
       receiveState.reject = reject;
 
-      // 设置超时
       receiveState.timeoutId = setTimeout(() => {
         reject(new Error('接收分块超时'));
       }, this.RECEIVE_TIMEOUT);
@@ -654,34 +821,31 @@ export class TCPTransferProtocol implements TransferProtocolInterface {
     taskId: string,
     state: TransferState,
     percentage: number,
+    transferredBytes: number,
+    totalBytes: number,
+    speed?: number,
+    estimatedTime?: number,
     error?: string
   ): void {
     const progress: TransferProgress = {
       taskId,
       state,
-      transferredBytes: state === TransferState.COMPLETED ? 1 : 0,
-      totalBytes: 1,
+      transferredBytes,
+      totalBytes,
       progress: percentage,
+      speed,
+      estimatedTimeRemaining: estimatedTime,
       error
     };
-    
+
     this.progressMap.set(taskId, progress);
-    
-    // 触发进度更新事件
     this.eventManager.emitTransferProgress(taskId, progress);
-    
-    // 如果任务完成或失败，清理进度记录
-    if (state === TransferState.COMPLETED || state === TransferState.FAILED) {
+
+    // 清理已完成的进度记录
+    if (state === TransferState.COMPLETED || state === TransferState.FAILED || state === TransferState.CANCELLED) {
       setTimeout(() => {
         this.progressMap.delete(taskId);
-      }, 60000); // 1 分钟后清理
+      }, 60000);
     }
-  }
-
-  /**
-   * 延迟函数
-   */
-  private sleep(ms: number): Promise<void> {
-    return new Promise(resolve => setTimeout(resolve, ms));
   }
 }

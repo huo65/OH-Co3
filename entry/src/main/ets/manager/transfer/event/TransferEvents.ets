@@ -3,7 +3,8 @@
  * 定义传输过程中的各类事件和数据结构
  */
 import emitter from '@ohos.events.emitter';
-import { TransferProgress } from '../protocol/TransferProtocolInterface';
+import { TransferProgress, TransferState } from '../protocol/TransferProtocolInterface';
+import { TransferError } from '../model/TransferResult';
 
 /**
  * 传输事件 ID 枚举
@@ -26,13 +27,17 @@ export enum TransferEventId {
   /** 文件分块接收事件 */
   CHUNK_RECEIVED = 2008,
   /** 文件重组完成事件 */
-  FILE_REASSEMBLED = 2009
+  FILE_REASSEMBLED = 2009,
+  /** 协议注册事件 */
+  PROTOCOL_REGISTERED = 2010,
+  /** 协议注销事件 */
+  PROTOCOL_UNREGISTERED = 2011
 }
 
 /**
  * 传输事件数据接口
  */
-export interface TransferEventData extends emitter.EventData  {
+export interface TransferEventData extends emitter.EventData {
   /** 任务 ID */
   taskId: string;
   /** 事件类型 */
@@ -41,6 +46,67 @@ export interface TransferEventData extends emitter.EventData  {
   data?: Object;
   /** 时间戳 */
   timestamp?: number;
+}
+
+/**
+ * 传输开始事件数据
+ */
+export interface TransferStartEventData extends TransferEventData {
+  data: TransferStartData;
+}
+
+/**
+ * 传输开始数据
+ */
+export interface TransferStartData {
+  protocol: string;
+}
+
+/**
+ * 传输进度事件数据
+ */
+export interface TransferProgressEventData extends TransferEventData {
+  data: TransferProgress;
+}
+
+/**
+ * 传输完成事件数据
+ */
+export interface TransferCompleteEventData extends TransferEventData {
+  data: TransferCompleteData;
+}
+
+/**
+ * 传输完成数据
+ */
+export interface TransferCompleteData {
+  fileInfo: Object;
+  duration: number;
+  transferredBytes: number;
+  averageSpeed: number;
+  protocol: string;
+}
+
+/**
+ * 传输失败事件数据
+ */
+export interface TransferFailedEventData extends TransferEventData {
+  data: TransferFailedData;
+}
+
+/**
+ * 传输失败数据
+ */
+export interface TransferFailedData {
+  error: string;
+  errorCode?: string;
+}
+
+/**
+ * 协议事件数据
+ */
+export interface ProtocolEventData {
+  protocolName: string;
 }
 
 /**
@@ -99,7 +165,7 @@ export class TransferEventManager {
         eventId,
         priority
       }, eventData);
-      
+
       console.info(`[TransferEventManager] 事件发送：${TransferEventId[eventId]}, taskId=${taskId}`);
     } catch (error) {
       console.error('[TransferEventManager] 事件发送失败:', error);
@@ -118,14 +184,35 @@ export class TransferEventManager {
     priority: emitter.EventPriority = emitter.EventPriority.HIGH
   ): void {
     try {
-        emitter.on(eventId.toString(), (eventData: emitter.EventData) => {
-          // 将原生事件数据转换为自定义类型
-          callback(eventData as TransferEventData);
-        });
+      emitter.on(eventId.toString(), (eventData: emitter.EventData) => {
+        callback(eventData as TransferEventData);
+      });
 
       console.info(`[TransferEventManager] 事件监听已注册：${TransferEventId[eventId]}`);
     } catch (error) {
       console.error('[TransferEventManager] 注册事件监听失败:', error);
+    }
+  }
+
+  /**
+   * 监听传输事件（一次性）
+   * @param eventId - 事件 ID
+   * @param callback - 回调函数
+   * @param priority - 事件优先级
+   */
+  once(
+    eventId: TransferEventId,
+    callback: (eventData: TransferEventData) => void,
+    priority: emitter.EventPriority = emitter.EventPriority.HIGH
+  ): void {
+    try {
+      emitter.once(eventId.toString(), (eventData: emitter.EventData) => {
+        callback(eventData as TransferEventData);
+      });
+
+      console.info(`[TransferEventManager] 一次性事件监听已注册：${TransferEventId[eventId]}`);
+    } catch (error) {
+      console.error('[TransferEventManager] 注册一次性事件监听失败:', error);
     }
   }
 
@@ -159,13 +246,8 @@ export class TransferEventManager {
    * @param protocol - 使用的协议
    */
   emitTransferStart(taskId: string, protocol: string): void {
-    // interface Data{
-    //   data:string
-    // }
-    // const eventData:Data = {
-    //   data:protocol
-    // }
-    this.emit(TransferEventId.TRANSFER_START, taskId, protocol);
+    const data: TransferStartData = { protocol: protocol };
+    this.emit(TransferEventId.TRANSFER_START, taskId, data);
   }
 
   /**
@@ -190,9 +272,11 @@ export class TransferEventManager {
    * 触发传输失败事件
    * @param taskId - 任务 ID
    * @param error - 错误信息
+   * @param errorCode - 错误码（可选）
    */
-  emitTransferFailed(taskId: string, error: string): void {
-    this.emit(TransferEventId.TRANSFER_FAILED, taskId, error);
+  emitTransferFailed(taskId: string, error: string, errorCode?: string): void {
+    const data: TransferFailedData = { error: error, errorCode: errorCode };
+    this.emit(TransferEventId.TRANSFER_FAILED, taskId, data);
   }
 
   /**
@@ -201,5 +285,23 @@ export class TransferEventManager {
    */
   emitTransferCancelled(taskId: string): void {
     this.emit(TransferEventId.TRANSFER_CANCELLED, taskId);
+  }
+
+  /**
+   * 触发协议注册事件
+   * @param protocolName - 协议名称
+   */
+  emitProtocolRegistered(protocolName: string): void {
+    const data: ProtocolEventData = { protocolName: protocolName };
+    this.emit(TransferEventId.PROTOCOL_REGISTERED, 'register', data);
+  }
+
+  /**
+   * 触发协议注销事件
+   * @param protocolName - 协议名称
+   */
+  emitProtocolUnregistered(protocolName: string): void {
+    const data: ProtocolEventData = { protocolName: protocolName };
+    this.emit(TransferEventId.PROTOCOL_UNREGISTERED, 'unregister', data);
   }
 }

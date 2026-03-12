@@ -48,6 +48,11 @@ export interface ChunkData {
 }
 
 /**
+ * 传输任务状态类型
+ */
+export type TransferTaskState = 'pending' | 'connecting' | 'transferring' | 'completed' | 'failed' | 'cancelled';
+
+/**
  * 传输任务信息
  * 描述一个完整的文件传输任务
  */
@@ -63,7 +68,7 @@ export interface TransferTask {
   /** 使用的传输协议 */
   protocol: string;
   /** 当前传输状态 */
-  state: string;
+  state: TransferTaskState;
   /** 源设备 IP 地址（TCP 传输时使用） */
   sourceIp?: string;
   /** 目标设备 IP 地址（TCP 传输时使用） */
@@ -76,6 +81,10 @@ export interface TransferTask {
   startedAt?: number;
   /** 完成时间戳 */
   completedAt?: number;
+  /** 重试次数 */
+  retryCount?: number;
+  /** 错误信息 */
+  errorMessage?: string;
 }
 
 /**
@@ -119,3 +128,42 @@ export interface TransferNotifyInfo {
  * 当传输协议准备就绪后调用，用于通知目标设备可以开始接收数据
  */
 export type TransferNotifyCallback = (notifyInfo: TransferNotifyInfo) => Promise<void>;
+
+/**
+ * 创建默认文件信息
+ * @param fileName - 文件名
+ * @param size - 文件大小
+ * @returns 文件信息对象
+ */
+export function createFileInfo(fileName: string, size: number): FileInfo {
+  return {
+    fileId: generateFileId(),
+    fileName,
+    size,
+    createdAt: Date.now()
+  };
+}
+
+/**
+ * 生成文件唯一标识
+ * @returns 文件 ID
+ */
+export function generateFileId(): string {
+  return `file_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+}
+
+/**
+ * 验证文件信息完整性
+ * @param fileInfo - 文件信息
+ * @returns 是否有效
+ */
+export function isValidFileInfo(fileInfo: FileInfo): boolean {
+  return (
+    fileInfo.fileId !== undefined &&
+    fileInfo.fileId.length > 0 &&
+    fileInfo.fileName !== undefined &&
+    fileInfo.fileName.length > 0 &&
+    fileInfo.size !== undefined &&
+    fileInfo.size >= 0
+  );
+}

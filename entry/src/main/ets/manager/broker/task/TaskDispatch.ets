@@ -227,7 +227,7 @@ class TaskDispatch{
           size: 0,
           hash: taskInfo.fileHash
         };
-        const fileData = await FileTransferManager.getInstance().receiveFile(
+        const fileResult = await FileTransferManager.getInstance().receiveFile(
           taskInfo.taskId,
           taskInfo.sourceIp,
           fileInfo
@@ -235,11 +235,16 @@ class TaskDispatch{
         // TODO 注销TCP
 
         // 将接收到的文件数据还原到任务参数
-        if (taskInfo.params.type === InferenceInputType.IMAGE) {
-          const imageDataObj: ImageInputData = {
-            imageData: FileUtils.arrayBufferToBase64(fileData as ArrayBuffer)
-          };
-          taskInfo.params.data = imageDataObj;
+        if (fileResult.success && fileResult.data instanceof ArrayBuffer) {
+          if (taskInfo.params.type === InferenceInputType.IMAGE) {
+            const imageDataObj: ImageInputData = {
+              imageData: FileUtils.arrayBufferToBase64(fileResult.data)
+            };
+            taskInfo.params.data = imageDataObj;
+          }
+        } else {
+          console.error('[TaskDispatch] 文件接收失败:', fileResult.error?.message);
+          return;
         }
 
         // 执行推理并返回结果

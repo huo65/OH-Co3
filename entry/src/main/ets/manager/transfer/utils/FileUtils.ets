@@ -2,9 +2,13 @@
  * 文件处理工具类
  * 提供文件分块、重组、哈希计算等功能
  */
-import { ChunkData, FileInfo } from '../model/TransferDataModels';
+import { ChunkData, FileInfo, generateFileId } from '../model/TransferDataModels';
 import { cryptoFramework } from '@kit.CryptoArchitectureKit';
 import { util } from '@kit.ArkTS';
+
+/**
+ * 文件处理工具类
+ */
 export class FileUtils {
   /**
    * 将文件数据分块
@@ -16,12 +20,12 @@ export class FileUtils {
   static chunkFile(data: ArrayBuffer, chunkSize: number = 128 * 1024, taskId: string): ChunkData[] {
     const chunks: ChunkData[] = [];
     const totalChunks = Math.ceil(data.byteLength / chunkSize);
-    
+
     for (let i = 0; i < totalChunks; i++) {
       const start = i * chunkSize;
       const end = Math.min(start + chunkSize, data.byteLength);
       const chunkData = data.slice(start, end);
-      
+
       const chunk: ChunkData = {
         taskId,
         chunkIndex: i,
@@ -30,10 +34,10 @@ export class FileUtils {
         chunkSize: chunkData.byteLength,
         isLastChunk: i === totalChunks - 1
       };
-      
+
       chunks.push(chunk);
     }
-    
+
     console.info(`[FileUtils] 文件分块完成，总块数：${totalChunks}`);
     return chunks;
   }
@@ -50,21 +54,21 @@ export class FileUtils {
 
     // 按索引排序
     chunks.sort((a, b) => a.chunkIndex - b.chunkIndex);
-    
+
     // 计算总大小
     const totalSize = chunks.reduce((sum, chunk) => sum + chunk.data.byteLength, 0);
-    
+
     // 创建目标缓冲区
     const result = new Uint8Array(totalSize);
     let offset = 0;
-    
+
     // 依次复制每个分块
     for (const chunk of chunks) {
       const chunkArray = new Uint8Array(chunk.data);
       result.set(chunkArray, offset);
       offset += chunk.data.byteLength;
     }
-    
+
     console.info(`[FileUtils] 文件重组完成，总大小：${totalSize} 字节`);
     return result.buffer;
   }
@@ -81,14 +85,14 @@ export class FileUtils {
       const dataBlob: cryptoFramework.DataBlob = { data: uint8Array };
       await md.update(dataBlob);
       const mdResult: cryptoFramework.DataBlob = await md.digest();
-      
+
       // 转换为十六进制字符串
       const hashBytes = mdResult.data;
       let hashHex = '';
       for (let i = 0; i < hashBytes.length; i++) {
         hashHex += hashBytes[i].toString(16).padStart(2, '0');
       }
-      
+
       console.info(`[FileUtils] 哈希计算完成：${hashHex.substring(0, 16)}...`);
       return hashHex;
     } catch (error) {
@@ -166,27 +170,26 @@ export class FileUtils {
    * @returns 文件信息对象
    */
   static async getFileInfo(filePath: string): Promise<FileInfo> {
-    // TODO: 需要根据 OpenHarmony 的文件系统 API 实现
-    // 这里提供一个框架
     const pathParts: string[] = filePath.split('/');
     const fileName: string = pathParts.length > 0 ? pathParts[pathParts.length - 1] : 'unknown';
-    
+
     const fileInfo: FileInfo = {
-      fileId: FileUtils.generateFileId(),
+      fileId: generateFileId(),
       fileName: fileName,
-      size: 0, // 需要实际读取文件大小
+      size: 0,
       filePath: filePath,
       createdAt: Date.now()
     };
-    
+
     return fileInfo;
   }
 
   /**
    * 生成文件唯一标识
    * @returns 文件 ID
+   * @deprecated 使用 generateFileId 从 TransferDataModels 导入
    */
   static generateFileId(): string {
-    return `file_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    return generateFileId();
   }
 }

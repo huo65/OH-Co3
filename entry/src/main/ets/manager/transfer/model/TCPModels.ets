@@ -3,7 +3,7 @@
  * 包含 TCP 协议特有的数据结构和类型定义
  */
 
-import { TransferConfig, TransferNotifyInfo, TransferNotifyCallback } from '../protocol/TransferProtocolInterface';
+import { TransferNotifyInfo } from './TransferDataModels';
 import { FileInfo, ChunkData } from './TransferDataModels';
 
 /**
@@ -28,11 +28,14 @@ export interface TCPNotifyInfo extends TransferNotifyInfo {
   sourceIp: string;
   /** TCP 监听端口（TCP 特有） */
   port: number;
+  /** 时间戳 */
+  timestamp: number;
 }
 
 /**
  * TCP 传输通知回调类型
  * TCP 服务器就绪后调用，用于通知目标设备发起连接
+ * @deprecated 使用 TransferNotifyCallback 替代
  */
 export type TCPNotifyCallback = (notifyInfo: TCPNotifyInfo) => Promise<void>;
 
@@ -99,3 +102,46 @@ export interface TCPErrorMessage {
  * TCP 消息通用接口
  */
 export type TCPMessage = TCPHandshakeMessage | TCPChunkMessage | TCPChunkAckMessage | TCPCompleteMessage | TCPErrorMessage;
+
+/**
+ * 将通用通知信息转换为 TCP 通知信息
+ * @param notifyInfo - 通用通知信息
+ * @param sourceIp - 源 IP 地址
+ * @param port - TCP 端口
+ * @returns TCP 通知信息
+ */
+export function toTCPNotifyInfo(
+  notifyInfo: TransferNotifyInfo,
+  sourceIp: string,
+  port: number
+): TCPNotifyInfo {
+  const result: TCPNotifyInfo = {
+    taskId: notifyInfo.taskId,
+    protocol: notifyInfo.protocol,
+    sourceDevice: notifyInfo.sourceDevice,
+    targetDevice: notifyInfo.targetDevice,
+    fileInfo: notifyInfo.fileInfo,
+    fileHash: notifyInfo.fileHash,
+    sourceIp: sourceIp,
+    port: port,
+    timestamp: Date.now()
+  };
+  return result;
+}
+
+/**
+ * 从 TCP 通知信息提取通用通知信息
+ * @param tcpNotifyInfo - TCP 通知信息
+ * @returns 通用通知信息
+ */
+export function fromTCPNotifyInfo(tcpNotifyInfo: TCPNotifyInfo): TransferNotifyInfo {
+  const result: TransferNotifyInfo = {
+    taskId: tcpNotifyInfo.taskId,
+    protocol: tcpNotifyInfo.protocol,
+    sourceDevice: tcpNotifyInfo.sourceDevice,
+    targetDevice: tcpNotifyInfo.targetDevice,
+    fileInfo: tcpNotifyInfo.fileInfo,
+    fileHash: tcpNotifyInfo.fileHash
+  };
+  return result;
+}
