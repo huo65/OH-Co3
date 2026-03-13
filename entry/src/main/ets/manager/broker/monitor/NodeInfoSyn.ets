@@ -155,8 +155,6 @@ class NodeInfoSyn{
       if (ownName == objDeviceName) {
         const timeStamp: number = latencyInfoObj.timeStamp;
         const newTimepStamp = systemDateTime.getTime(false);
-        console.error(`getLatencyLast: ${timeStamp}`);
-        console.error(`getLatencyNew: ${newTimepStamp}`);
         let latency = newTimepStamp - timeStamp;
         this.lastLatency = latency;
       } else {

@@ -88,21 +88,21 @@ class SystemProfiler{
       const task = new taskpool.Task(getSystemCpuUsageAsync);
       const cpuUsage = await taskpool.execute(task);
       const rawValue = cpuUsage as number;
-      this.ownInfo.cpuUsage = Math.round(rawValue * 10000) / 10000;
+      this.ownInfo.cpuUsage = Math.round(rawValue * 10000) / 100;
     } catch (error) {
       console.error(`CPU info error: ${error.message}`);
     }
   }
   getMemoryInfo(){
     const rawValue = GetSystemInfo.getMemUsage();
-    this.ownInfo.memoryUsage = Math.round(rawValue * 10000) / 10000;
+    this.ownInfo.memoryUsage = Math.round(rawValue * 10000) / 100;
   }
 
   getStatfsInfo() {
     const context = getContext()
     try {
       const rawValue = statfs.getFreeSizeSync(context.filesDir) / statfs.getTotalSizeSync(context.filesDir);
-      this.ownInfo.storageFree = Math.round(rawValue * 10000) / 10000;
+      this.ownInfo.storageFree = Math.round(rawValue * 10000) / 100;
     } catch (error) {
       console.error(`storage info error: ${error.message}`);
     }
@@ -112,7 +112,7 @@ class SystemProfiler{
     this.ownInfo.batteryLevel = batteryInfo.batterySOC
   }
   updateLatency(){
-    this.ownInfo.latency = (nodeInfoSyn.lastLatency)/300;
+    this.ownInfo.latency = (nodeInfoSyn.lastLatency);
   }
 
 }
