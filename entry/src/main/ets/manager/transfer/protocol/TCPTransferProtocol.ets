@@ -404,15 +404,18 @@ export class TCPTransferProtocol implements CapableProtocolInterface {
         sendState.sentChunks++;
         const progress = Math.round((sendState.sentChunks / chunks.length) * 100);
         const now = Date.now();
-        const speed = calculateSpeed(
-          (i + 1) * chunkSize,
-          now - sendState.startTime
-        );
-        const estimatedTime = calculateEstimatedTime(
-          (i + 1) * chunkSize,
-          fileData.byteLength,
-          now - sendState.startTime
-        );
+        // 为了效率暂时注释。后续传输超大文件时再用
+        const speed = 0;
+        //   calculateSpeed(
+        //   (i + 1) * chunkSize,
+        //   now - sendState.startTime
+        // );
+        const estimatedTime = 0;
+        //   calculateEstimatedTime(
+        //   (i + 1) * chunkSize,
+        //   fileData.byteLength,
+        //   now - sendState.startTime
+        // );
 
         this.updateProgress(taskId, TransferState.TRANSFERRING, progress, (i + 1) * chunkSize, fileData.byteLength, speed, estimatedTime);
 
@@ -762,15 +765,18 @@ export class TCPTransferProtocol implements CapableProtocolInterface {
       : 0;
 
     const now = Date.now();
-    const speed = calculateSpeed(
-      receiveState.receivedChunks * chunkData.byteLength,
-      now - receiveState.startTime
-    );
-    const estimatedTime = calculateEstimatedTime(
-      receiveState.receivedChunks * chunkData.byteLength,
-      receiveState.fileInfo.size,
-      now - receiveState.startTime
-    );
+    // 为了效率暂时注释。后续传输超大文件时再用
+    const speed = 0;
+    // calculateSpeed(
+    //   receiveState.receivedChunks * chunkData.byteLength,
+    //   now - receiveState.startTime
+    // );
+    const estimatedTime = 0;
+    //   calculateEstimatedTime(
+    //   receiveState.receivedChunks * chunkData.byteLength,
+    //   receiveState.fileInfo.size,
+    //   now - receiveState.startTime
+    // );
 
     this.updateProgress(
       taskId,
