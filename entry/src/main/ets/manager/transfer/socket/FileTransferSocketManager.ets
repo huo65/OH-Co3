@@ -22,6 +22,8 @@ export interface TCPConnectionInfo {
   createdAt: number;
   /** 最后活跃时间 */
   lastActiveAt: number;
+  /** 接收缓冲区 - 用于处理TCP粘包/拆包 */
+  receiveBuffer: ArrayBuffer;
 }
 
 /**
@@ -128,7 +130,8 @@ export class FileTransferSocketManager {
         remotePort: 0,
         socket: client,
         createdAt: Date.now(),
-        lastActiveAt: Date.now()
+        lastActiveAt: Date.now(),
+        receiveBuffer: new ArrayBuffer(0)
       };
       
       this.connections.set(connectionId, connectionInfo);
@@ -166,6 +169,7 @@ export class FileTransferSocketManager {
 
   /**
    * 通用的消息监听设置
+   * 实现消息缓冲机制处理TCP粘包/拆包问题
    */
   private setupMessageListener(
     connectionId: string,
@@ -177,9 +181,11 @@ export class FileTransferSocketManager {
     client.on('message', (value: MessageValue) => {
       // 更新最后活跃时间
       const conn = this.connections.get(connectionId);
-      if (conn) {
-        conn.lastActiveAt = Date.now();
+      if (!conn) {
+        console.warn(`[FileTransferSocketManager] 连接已不存在，connectionId=${connectionId}`);
+        return;
       }
+      conn.lastActiveAt = Date.now();
 
       // 获取消息数据
       const messageData = value.message;
@@ -188,17 +194,79 @@ export class FileTransferSocketManager {
         return;
       }
 
-      console.info(`[FileTransferSocketManager] 收到消息，connectionId=${connectionId}, size=${messageData.byteLength}`);
+      // 将新数据追加到缓冲区
+      const oldBuffer = conn.receiveBuffer;
+      const newBuffer = new ArrayBuffer(oldBuffer.byteLength + messageData.byteLength);
+      new Uint8Array(newBuffer).set(new Uint8Array(oldBuffer), 0);
+      new Uint8Array(newBuffer).set(new Uint8Array(messageData), oldBuffer.byteLength);
+      conn.receiveBuffer = newBuffer;
 
-      // 通知所有注册的回调
-      this.messageCallbacks.forEach((callback, taskId) => {
-        try {
-          callback(connectionId, messageData);
-        } catch (error) {
-          console.error(`[FileTransferSocketManager] 消息回调执行失败，taskId=${taskId}:`, error);
-        }
-      });
+      console.info(`[FileTransferSocketManager] 收到数据，connectionId=${connectionId}, ` +
+        `本次=${messageData.byteLength}字节, 缓冲区=${newBuffer.byteLength}字节`);
+
+      // 尝试从缓冲区解析完整消息
+      this.tryParseMessages(connectionId);
     });
+  }
+
+  /**
+   * 尝试从缓冲区解析完整消息
+   * 消息格式: [4字节长度(大端)][JSON头部数据]
+   */
+  private tryParseMessages(connectionId: string): void {
+    const conn = this.connections.get(connectionId);
+    if (!conn || conn.receiveBuffer.byteLength < 4) {
+      return;
+    }
+
+    const buffer = conn.receiveBuffer;
+    const bufferView = new DataView(buffer);
+
+    // 读取消息头长度（大端序）
+    const headerLength = bufferView.getInt32(0, false);
+
+    // 验证消息头长度的合理性
+    if (headerLength <= 0 || headerLength > 10 * 1024 * 1024) { // 最大10MB的JSON头
+      console.error(`[FileTransferSocketManager] 无效的消息头长度: ${headerLength}，清空缓冲区`);
+      conn.receiveBuffer = new ArrayBuffer(0);
+      return;
+    }
+
+    // 检查是否已收到完整的消息
+    const totalMessageLength = 4 + headerLength;
+    if (buffer.byteLength < totalMessageLength) {
+      console.info(`[FileTransferSocketManager] 消息不完整，等待更多数据。` +
+        `需要=${totalMessageLength}字节, 当前=${buffer.byteLength}字节`);
+      return;
+    }
+
+    // 提取一条完整消息
+    const messageData = buffer.slice(0, totalMessageLength);
+
+    // 更新缓冲区，移除已处理的消息
+    const remainingLength = buffer.byteLength - totalMessageLength;
+    if (remainingLength > 0) {
+      conn.receiveBuffer = buffer.slice(totalMessageLength);
+    } else {
+      conn.receiveBuffer = new ArrayBuffer(0);
+    }
+
+    console.info(`[FileTransferSocketManager] 解析出完整消息，长度=${totalMessageLength}字节, ` +
+      `剩余缓冲=${conn.receiveBuffer.byteLength}字节`);
+
+    // 通知所有注册的回调
+    this.messageCallbacks.forEach((callback, taskId) => {
+      try {
+        callback(connectionId, messageData);
+      } catch (error) {
+        console.error(`[FileTransferSocketManager] 消息回调执行失败，taskId=${taskId}:`, error);
+      }
+    });
+
+    // 递归处理缓冲区中可能存在的更多消息
+    if (conn.receiveBuffer.byteLength >= 4) {
+      this.tryParseMessages(connectionId);
+    }
   }
 
   /**
@@ -288,7 +356,8 @@ export class FileTransferSocketManager {
         remotePort: port,
         socket: tcpClient,
         createdAt: Date.now(),
-        lastActiveAt: Date.now()
+        lastActiveAt: Date.now(),
+        receiveBuffer: new ArrayBuffer(0)
       };
 
       this.connections.set(connectionId, connectionInfo);
