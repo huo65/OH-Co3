@@ -8,7 +8,7 @@ export class GlobalTaskManager {
   static init(worker: InferenceWorker): void {
     if (!GlobalTaskManager.instance) {
       GlobalTaskManager.instance = new SerialTaskQueue(worker);
-      console.info('[GlobalTaskManager] Task queue initialized');
+      console.info(`[HarmonyInference] [GlobalTaskManager] 全局任务队列初始化完成`);
     }
   }
 

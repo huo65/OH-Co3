@@ -113,14 +113,14 @@ class NodeInfoSyn{
           latency: parseFloat(params.latency.toFixed(2))
         };
         this.otherNodeInfo = this.otherNodeInfo.filter(node => node.deviceName !== newDeviceName);
-        console.log("device ADD:" + newDeviceName);
+        console.info(`[HarmonyInference] [NodeInfoSyn] 新设备节点加入网络: ${newDeviceName}`);
 
         this.otherNodeInfo.push(newNodeInfo);
       } else {
-        console.log("device self");
+        console.info(`[HarmonyInference] [NodeInfoSyn] 忽略本设备自身状态广播`);
       }
     } catch (e) {
-      console.error("Error parsing message:", e);
+      console.error(`[HarmonyInference] [NodeInfoSyn] 解析节点信息消息失败: ${e}`);
     }
   }
 
@@ -157,12 +157,12 @@ class NodeInfoSyn{
         const newTimepStamp = systemDateTime.getTime(false);
         let latency = newTimepStamp - timeStamp;
         this.lastLatency = latency;
+        console.info(`[HarmonyInference] [NodeInfoSyn] 网络延迟测试完成: ${latency}ms`);
       } else {
-        // TODO 统一日志格式处理，规范格式
-        console.log("huoNO");
+        console.info(`[HarmonyInference] [NodeInfoSyn] 忽略其他设备的延迟测试响应，来源: ${objDeviceName}`);
       }
     } catch (e) {
-      console.error("Error parsing message:", e);
+      console.error(`[HarmonyInference] [NodeInfoSyn] 解析延迟测试消息失败: ${e}`);
     }
     return 0;
   }

@@ -108,7 +108,7 @@ class HarmonyInferenceClient {
         }
       }, 10000);
     }catch (error) {
-      console.error("Failed to check connection status:", error);
+      console.error(`[HarmonyInference] [Client] 检查连接状态失败: ${error}`);
       this.connectionStatus = 'Error';
     }
 
@@ -143,7 +143,7 @@ class HarmonyInferenceClient {
         eventId: RESULT_EVENT_ID,
         priority: emitter.EventPriority.LOW
       }, (eventData) => {
-        console.log("结果处理事件监听")
+        console.info(`[HarmonyInference] [Client] 接收到任务结果事件`);
         let message:string = JSON.stringify(eventData)
         let dataMessage:DataPass = JSON.parse(message)
         let realData:string = JSON.stringify(dataMessage.data)
@@ -190,7 +190,7 @@ class HarmonyInferenceClient {
       this.isInitialized = true;
       return true;
     } catch (error) {
-      console.error('HarmonyInferenceClient initialization failed:', error);
+      console.error(`[HarmonyInference] [Client] 初始化失败: ${error}`);
       return false;
     }
   }
@@ -219,9 +219,9 @@ class HarmonyInferenceClient {
 
 
       this.isInitialized = false;
-      console.info('HarmonyInferenceClient destroyed successfully');
+      console.info(`[HarmonyInference] [Client] 实例销毁成功，资源已释放`);
     } catch (error) {
-      console.error('HarmonyInferenceClient destruction failed:', error);
+      console.error(`[HarmonyInference] [Client] 实例销毁失败: ${error}`);
       const errorMsg = error instanceof Error ? error.message : String(error);
       throw new Error(errorMsg);
     }
@@ -243,10 +243,10 @@ class HarmonyInferenceClient {
   private startDeviceStatusSync(): void {
     // 设备状态同步由SystemProfiler和NodeInfoSyn模块自动处理
     // 这里不需要额外的代码，只需要确保这些模块正常工作
-    console.info('Device status sync started');
+    console.info(`[HarmonyInference] [Client] 设备状态同步已启动`);
     // 检查是否已存在定时器
     if (this.syncIntervalId !== null) {
-      console.warn('Device status sync is already running');
+      console.warn(`[HarmonyInference] [Client] 设备状态同步已在运行中`);
       return;
     }
     // 启动定时器并保存ID
@@ -259,9 +259,9 @@ class HarmonyInferenceClient {
     if (this.syncIntervalId !== null) {
       clearInterval(this.syncIntervalId); // 清除定时任务
       this.syncIntervalId = null;         // 重置ID
-      console.info('Device status sync stopped');
+      console.info(`[HarmonyInference] [Client] 设备状态同步已停止`);
     } else {
-      console.warn('No active device status sync found');
+      console.warn(`[HarmonyInference] [Client] 未找到活跃的设备状态同步任务`);
     }
   }
 
@@ -310,15 +310,15 @@ class HarmonyInferenceClient {
 
   private handleTaskResult(resultData: string): void {
     try {
-      console.log("结果处理进入",resultData)
+      console.info(`[HarmonyInference] [Client] 开始处理任务结果`);
       const taskResult:TaskResTransmitData | null = taskDispatch.parseResultMessage(resultData);
       if (taskResult != null) {
-        console.log("结果处理完成存入Map",taskResult.taskId)
+        console.info(`[HarmonyInference] [Client] 任务结果已存入结果映射表，任务ID: ${taskResult.taskId}`);
         this.taskResultMap.set(taskResult.taskId,taskResult.params);
       }
 
     } catch (error) {
-      console.error('Error handling task result:', error);
+      console.error(`[HarmonyInference] [Client] 处理任务结果失败: ${error}`);
     }
   }
 
@@ -338,12 +338,12 @@ class HarmonyInferenceClient {
 
       if (shouldExecuteLocally) {
         // 本地执行推理，添加到全局任务队列
-        console.info('Adding inference task to local queue');
+        console.info(`[HarmonyInference] [Client] 任务将在本地执行，添加到任务队列`);
         const result = await GlobalTaskManager.getQueue().addTask(task);
         return result;
       } else {
         const taskId:string = task.taskId as string;
-        console.log("结果处理目标",taskId)
+        console.info(`[HarmonyInference] [Client] 任务已分发，等待远程结果，任务ID: ${taskId}`);
         // 任务已发送到其他设备，需要等待结果
         return new Promise((resolve, reject) => {
           const checkInterval = setInterval(() => {
@@ -351,7 +351,7 @@ class HarmonyInferenceClient {
             if (result !== undefined && result !== null) {
               clearInterval(checkInterval);
               this.taskResultMap.delete(taskId);
-              console.log("结果处理返回",result.success)
+              console.info(`[HarmonyInference] [Client] 收到远程任务结果，任务ID: ${taskId}，执行状态: ${result.success}`);
               resolve(result);
             }
           }, 100); // 每100ms检查一次结果
@@ -364,7 +364,7 @@ class HarmonyInferenceClient {
       }
     } catch (err) {
       const errorMsg = err instanceof Error ? err.message : String(err);
-      console.error(`Error: ${errorMsg}`);
+      console.error(`[HarmonyInference] [Client] 提交任务失败: ${errorMsg}`);
       throw new Error(errorMsg);
     }
   }

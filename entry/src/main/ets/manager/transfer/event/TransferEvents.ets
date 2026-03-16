@@ -166,9 +166,9 @@ export class TransferEventManager {
         priority
       }, eventData);
 
-      console.info(`[TransferEventManager] 事件发送：${TransferEventId[eventId]}, taskId=${taskId}`);
+      console.info(`[HarmonyInference] [TransferEventManager] 事件发送成功: ${TransferEventId[eventId]}, 任务ID: ${taskId}`);
     } catch (error) {
-      console.error('[TransferEventManager] 事件发送失败:', error);
+      console.error(`[HarmonyInference] [TransferEventManager] 事件发送失败: ${error}`);
     }
   }
 
@@ -188,9 +188,9 @@ export class TransferEventManager {
         callback(eventData as TransferEventData);
       });
 
-      console.info(`[TransferEventManager] 事件监听已注册：${TransferEventId[eventId]}`);
+      console.info(`[HarmonyInference] [TransferEventManager] 事件监听已注册: ${TransferEventId[eventId]}`);
     } catch (error) {
-      console.error('[TransferEventManager] 注册事件监听失败:', error);
+      console.error(`[HarmonyInference] [TransferEventManager] 注册事件监听失败: ${error}`);
     }
   }
 
@@ -210,9 +210,9 @@ export class TransferEventManager {
         callback(eventData as TransferEventData);
       });
 
-      console.info(`[TransferEventManager] 一次性事件监听已注册：${TransferEventId[eventId]}`);
+      console.info(`[HarmonyInference] [TransferEventManager] 一次性事件监听已注册: ${TransferEventId[eventId]}`);
     } catch (error) {
-      console.error('[TransferEventManager] 注册一次性事件监听失败:', error);
+      console.error(`[HarmonyInference] [TransferEventManager] 注册一次性事件监听失败: ${error}`);
     }
   }
 
@@ -223,9 +223,9 @@ export class TransferEventManager {
   off(eventId: TransferEventId): void {
     try {
       emitter.off(eventId);
-      console.info(`[TransferEventManager] 事件监听已移除：${TransferEventId[eventId]}`);
+      console.info(`[HarmonyInference] [TransferEventManager] 事件监听已移除: ${TransferEventId[eventId]}`);
     } catch (error) {
-      console.error('[TransferEventManager] 移除事件监听失败:', error);
+      console.error(`[HarmonyInference] [TransferEventManager] 移除事件监听失败: ${error}`);
     }
   }
 

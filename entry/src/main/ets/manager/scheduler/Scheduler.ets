@@ -40,18 +40,18 @@ class Scheduler{
         }
       }
     } catch (error) {
-      console.error("Failed to send task:", error);
+      console.error(`[HarmonyInference] [Scheduler] 获取设备信息失败: ${error}`);
     }
 
     if (highestScoreNode) {
-      console.log(`Highest score node id: ${highestScoreNode[0]}, Score: ${this.calculate_score(highestScoreNode[1])}`);
+      console.info(`[HarmonyInference] [Scheduler] 最优节点: ${highestScoreNode[0]}, 评分: ${this.calculate_score(highestScoreNode[1]).toFixed(2)}`);
       if (highestScoreNode[0] != ownName) {
         this.dispatchTask(task, highestScoreNode[0])
-        console.log('任务发送到其他节点')
+        console.info(`[HarmonyInference] [Scheduler] 任务已分发至节点: ${highestScoreNode[0]}`);
         return false
       }
     } else {
-      console.log("No nodes found.");
+      console.warn(`[HarmonyInference] [Scheduler] 未找到可用节点，将在本地执行任务`);
     }
     return true
   }
@@ -98,7 +98,7 @@ class Scheduler{
       taskInfo.params = inferenceTask;
       taskDispatch.sendTask(taskInfo);
     } catch (error) {
-      console.error("Failed to send task:", error);
+      console.error(`[HarmonyInference] [Scheduler] 分发任务失败: ${error}`);
     }
   }
 }

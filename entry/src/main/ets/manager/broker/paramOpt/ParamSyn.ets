@@ -24,7 +24,7 @@ class ParamSyn{
    */
   parseParamMessage(message:string){
     const parsedMessage = JSON.parse(message) as ParamMessage;
-    console.log("参数更新"+parsedMessage.param.toString())
+    console.info(`[HarmonyInference] [ParamSyn] 参数优化更新: [${parsedMessage.param.join(', ')}]`);
     this.param = parsedMessage.param;
   }
 

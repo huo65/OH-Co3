@@ -39,9 +39,9 @@ export class SerialTaskQueue {
       try {
         this.taskQueue.add(taskInfo);
       } catch (error) {
-        console.error(`[SerialTaskQueue] Task add failed: ${error}`);
+        console.error(`[HarmonyInference] [SerialTaskQueue] 添加任务到队列失败: ${error}`);
       }
-      console.info(`[SerialTaskQueue] Task added to queue: ${taskId}, queue length: ${this.taskQueue.length}`);
+      console.info(`[HarmonyInference] [SerialTaskQueue] 任务已加入队列，任务ID: ${taskId}，当前队列长度: ${this.taskQueue.length}`);
       
       // 如果当前没有在处理任务，立即开始处理
       if (!this.isProcessing) {
@@ -62,16 +62,16 @@ export class SerialTaskQueue {
       // 取出队列中的第一个任务
       // taskInfo = this.taskQueue.getFirst()!;
       taskInfo = this.taskQueue.removeFirst();
-      console.info(`[SerialTaskQueue] Processing task: ${taskInfo.taskId}`);
+      console.info(`[HarmonyInference] [SerialTaskQueue] 开始处理任务，任务ID: ${taskInfo.taskId}`);
       
       // 执行推理
       const result: InferenceResult = await this.worker.infer(taskInfo.task);
       
       // 任务执行成功
       taskInfo.resolve(result);
-      console.info(`[SerialTaskQueue] Task completed: ${taskInfo.taskId}`);
+      console.info(`[HarmonyInference] [SerialTaskQueue] 任务执行完成，任务ID: ${taskInfo.taskId}`);
     } catch (error) {
-      console.error(`[SerialTaskQueue] Task execution failed: ${error}`);
+      console.error(`[HarmonyInference] [SerialTaskQueue] 任务执行失败: ${error}`);
       if (taskInfo) {
         taskInfo.reject(error as Error);
       }
@@ -93,10 +93,10 @@ export class SerialTaskQueue {
       });
       this.taskQueue.clear();
     } catch (error) {
-      console.error(`[SerialTaskQueue] Task clear failed: ${error}`);
+      console.error(`[HarmonyInference] [SerialTaskQueue] 清空任务队列失败: ${error}`);
     }
     this.isProcessing = false;
-    console.log('[SerialTaskQueue] 队列已关闭');
+    console.info(`[HarmonyInference] [SerialTaskQueue] 任务队列已关闭`);
   }
 
   // 获取当前队列长度

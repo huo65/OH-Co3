@@ -1,6 +1,6 @@
 import { HarmonyInferenceClient, MQTTConfig, InferenceTask, SystemStatus } from '../manager/HarmonyInferenceClient';
 import { DeviceInfo } from '../manager/monitor/SystemProfiler';
-import { InferenceInputType, InferenceWorker } from '../manager/worker/InferenceWorker';
+import { ImageInputData, InferenceInputType, InferenceWorker } from '../manager/worker/InferenceWorker';
 import { SelectTitleBar } from '@kit.ArkUI';
 import { ModelManager } from '../TestImageTask/ImageIdModelManager';
 import deviceInfo from '@ohos.deviceInfo';
@@ -17,6 +17,7 @@ export struct TestClientPage {
   @State logMessages: string[] = [];
   @State systemStatus: SystemStatus | null = null;
   private imageBuffer:ArrayBuffer | null = null;
+  private testTask: InferenceTask | null = null; // 延迟初始化
   aboutToAppear() {
     // 获取资源管理器
     const resMgr = getContext(this).resourceManager;
@@ -30,7 +31,19 @@ export struct TestClientPage {
 
       // 转换为 ArrayBuffer
       this.imageBuffer = uint8Array.buffer as ArrayBuffer;
-      console.log('Image buffer loaded successfully');
+      // 资源加载完成后初始化任务
+      this.testTask = {
+        taskId: `task-${Date.now()}`,
+        modelName: 'image-model.ms',
+        type: InferenceInputType.IMAGE,
+        data: {
+          type: InferenceInputType.IMAGE,
+          buffer: this.imageBuffer
+        } as ImageInputData,
+        params: { "maxResults": 5 }
+      };
+
+      console.log('Task initialized successfully');
     } catch (error) {
       console.error(`Failed to load image: ${error.message}`);
     }
@@ -38,7 +51,7 @@ export struct TestClientPage {
   // TODO 改进测试页面
   // MQTT配置
   private mqttConfig: MQTTConfig = {
-    url: 'mqtt://10.158.126.159:1883',
+    url: 'mqtt://10.238.161.159:1883',
     //测试防止重复 clientId: deviceInfo.marketName + "_" + Math.floor(Math.random() * 10000),
     clientId: deviceInfo.marketName,
     userName: 'root',
@@ -48,21 +61,21 @@ export struct TestClientPage {
   };
 
 
-  // 测试任务
-  private testTask: InferenceTask = {
-    taskId: `task-${Date.now()}`,
-    modelName: 'image-model.ms',
-    type: InferenceInputType.IMAGE,
-    data: {
-      // 默认使用entry/src/main/resources/base/media/dog.jpg
-      // imageData: ""
-      type: InferenceInputType.IMAGE,
-      buffer: this.imageBuffer as ArrayBuffer,
-    },
-    params: {
-      "maxResults": 5
-    }
-  };
+  // // 测试任务
+  // private testTask: InferenceTask = {
+  //   taskId: `task-${Date.now()}`,
+  //   modelName: 'image-model.ms',
+  //   type: InferenceInputType.IMAGE,
+  //   data: {
+  //     // 默认使用entry/src/main/resources/base/media/dog.jpg
+  //     // imageData: ""
+  //     type: InferenceInputType.IMAGE,
+  //     buffer: this.imageBuffer as ArrayBuffer,
+  //   } as ImageInputData,
+  //   params: {
+  //     "maxResults": 5
+  //   }
+  // };
 
   build() {
     Scroll() {
@@ -123,7 +136,7 @@ export struct TestClientPage {
           
           try {
             this.log('Submitting test task...');
-            const result = await this.client.submitTask(this.testTask);
+            const result = await this.client.submitTask(this.testTask as InferenceTask);
             this.testResult = JSON.stringify(result);
             this.log('Task completed successfully');
           } catch (error) {

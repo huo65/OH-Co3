@@ -126,14 +126,14 @@ class TaskDispatch{
     const MQTTInstance: MQTTClient = MQTTClient.getInstance();
     try {
       const dataSize = this.estimateDataSize(taskInfo.params);
-      console.info(`[TaskDispatch] 估算数据大小：dataSize=${dataSize}`);
+      console.info(`[HarmonyInference] [TaskDispatch] 估算任务数据大小: ${dataSize} 字节，任务ID: ${taskInfo.taskId}`);
 
       if (dataSize > this.fileSizeThreshold) {
-        console.info(`[TaskDispatch] 大文件传输，显式指定 TCP 协议，taskId=${taskInfo.taskId}`);
+        console.info(`[HarmonyInference] [TaskDispatch] 大文件传输模式，启用TCP协议，任务ID: ${taskInfo.taskId}`);
         // 将任务数据转换为传输用的 ArrayBuffer
         const fileData = this.extractFileData(taskInfo.params);
         if (!fileData) {
-          console.error('[TaskDispatch] 无法提取文件数据');
+          console.error(`[HarmonyInference] [TaskDispatch] 无法提取文件数据，任务ID: ${taskInfo.taskId}`);
           return false;
         }
 
@@ -160,7 +160,7 @@ class TaskDispatch{
           taskInfo.sourceDevice = tcpNotifyInfo.sourceIp;
           const taskInfoMessage = JSON.stringify(taskInfo);
           await MQTTInstance.pushMessage(taskInfoMessage, '/task/assign');
-          console.info(`[TaskDispatch] 已通过 MQTT 通知目标设备发起连接，sourceIp=${tcpNotifyInfo.sourceIp}, port=${tcpNotifyInfo.port}`);
+          console.info(`[HarmonyInference] [TaskDispatch] 已通过MQTT通知目标设备发起TCP连接，源IP: ${tcpNotifyInfo.sourceIp}, 端口: ${tcpNotifyInfo.port}`);
         };
 
         await FileTransferManager.getInstance().transferFile(
@@ -179,7 +179,7 @@ class TaskDispatch{
         return true;
       }
     } catch (e) {
-      console.error('[TaskDispatch] sendTask 异常:', e);
+      console.error(`[HarmonyInference] [TaskDispatch] 发送任务异常: ${e}`);
       return false;
     }
   }
@@ -207,7 +207,7 @@ class TaskDispatch{
    * @returns 数据大小（字节）
    */
   private estimateDataSize(task: InferenceTask): number {
-    console.info(`[TaskDispatch] 文件类型 type=${task.type}`);
+    console.info(`[HarmonyInference] [TaskDispatch] 估算文件大小，文件类型: ${task.type}`);
     return InferenceDataUtils.estimateInputDataSize(task.data);
   }
 
@@ -219,7 +219,7 @@ class TaskDispatch{
    */
   async parseTaskMessage(message: string) {
     const taskInfo: TaskTransmitData = JSON.parse(message);
-    console.info('收到任务消息', taskInfo.taskId);
+    console.info(`[HarmonyInference] [TaskDispatch] 收到任务消息，任务ID: ${taskInfo.taskId}`);
 
     if (taskInfo.toClient !== ownName) {
       return;
@@ -230,7 +230,7 @@ class TaskDispatch{
       // 大文件传输：委托 FileTransferManager 接收文件
       // transferType 的值即为协议名称（如 'TCP', 'UDP' 等）
       const protocolName = taskInfo.transferType;
-      console.info(`收到 ${protocolName} 大文件传输任务，委托 FileTransferManager 建立连接并接收`);
+      console.info(`[HarmonyInference] [TaskDispatch] 收到${protocolName}大文件传输任务，委托FileTransferManager接收文件`);
       try {
         const fileInfo: FileInfo = {
           fileId: taskInfo.taskId,
@@ -255,18 +255,18 @@ class TaskDispatch{
             taskInfo.params.data = imageDataObj;
           }
         } else {
-          console.error('[TaskDispatch] 文件接收失败:', fileResult.error?.message);
+          console.error(`[HarmonyInference] [TaskDispatch] 文件接收失败: ${fileResult.error?.message}`);
           return;
         }
 
         // 执行推理并返回结果
         await this.executeAndReturn(taskInfo);
       } catch (error) {
-        console.error(`[TaskDispatch] ${protocolName} 文件接收失败:`, error);
+        console.error(`[HarmonyInference] [TaskDispatch] ${protocolName}文件接收失败: ${error}`);
       }
     } else {
       // 直接传输：执行本地推理并返回结果
-      console.info('收到分配任务');
+      console.info(`[HarmonyInference] [TaskDispatch] 收到直接传输任务，开始本地推理`);
       await this.executeAndReturn(taskInfo);
     }
   }
@@ -295,10 +295,10 @@ class TaskDispatch{
     const MQTTInstance: MQTTClient = MQTTClient.getInstance()
     try {
       const taskResMessage = JSON.stringify(inferenceResult);
-      console.info('发送分配任务结果');
+      console.info(`[HarmonyInference] [TaskDispatch] 发送任务执行结果，任务ID: ${inferenceResult.taskId}`);
       MQTTInstance.pushMessage(taskResMessage,"/task/result");
     } catch (e) {
-      console.error(e);
+      console.error(`[HarmonyInference] [TaskDispatch] 发送任务结果异常: ${e}`);
     }
   }
 
@@ -310,10 +310,10 @@ class TaskDispatch{
   parseResultMessage(message: string): TaskResTransmitData | null {
     const taskResult: TaskResTransmitData = JSON.parse(message);
     const fromClient = taskResult.fromClient;
-    console.log("结果处理解析", fromClient)
-    console.log("结果处理判断", ownName)
+    console.info(`[HarmonyInference] [TaskDispatch] 解析任务结果消息，来源设备: ${fromClient}`);
+    console.info(`[HarmonyInference] [TaskDispatch] 当前设备名称: ${ownName}`);
     if (fromClient == ownName) {
-      console.log("结果处理返回", ownName)
+      console.info(`[HarmonyInference] [TaskDispatch] 匹配成功，返回本设备发出的任务结果`);
       return taskResult;
     }
     return null;

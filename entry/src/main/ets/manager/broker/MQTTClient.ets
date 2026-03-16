@@ -97,9 +97,9 @@ class MQTTClient {
       //    trustStore: fileDir + "/ca.crt" // CA证书的沙箱路径
       // }
     }).then((res: MqttResponse) => {
-      console.info('MQTT服务器连接连接成功：' + JSON.stringify(res.message))
+      console.info(`[HarmonyInference] [MQTTClient] MQTT服务器连接成功: ${JSON.stringify(res.message)}`)
     }).catch((err: Error) => {
-      console.error('MQTT服务器连接连接失败：' + JSON.stringify(err))
+      console.error(`[HarmonyInference] [MQTTClient] MQTT服务器连接失败: ${JSON.stringify(err)}`)
     })
   }
 
@@ -113,9 +113,9 @@ class MQTTClient {
       qos: this.qos as MqttQos
     }
     await this.mqttClient.subscribe(subscribeOption).then((res: MqttResponse) => {
-      console.info('MQTTbase订阅主题成功：', JSON.stringify(res.message),subscribeOption.topic)
+      console.info(`[HarmonyInference] [MQTTClient] 订阅基础主题成功: ${subscribeOption.topic}`)
     }).catch((err: Error) => {
-      console.error('MQTT订阅主题失败：', JSON.stringify(err))
+      console.error(`[HarmonyInference] [MQTTClient] 订阅基础主题失败: ${JSON.stringify(err)}`)
     })
     await this.subscribeTopic(["/device/list","/device/status","/task/assign","/task/result","/optimization/param","/test/latency"])
     // 监听订阅主题
@@ -136,9 +136,9 @@ class MQTTClient {
     }
 
     await this.mqttClient.subscribeMany(subscribeOptions).then((res: MqttResponse) => {
-      console.info('MQTT订阅主题成功：', JSON.stringify(res.message))
+      console.info(`[HarmonyInference] [MQTTClient] 批量订阅主题成功: ${topics.join(', ')}`)
     }).catch((err: Error) => {
-      console.error('MQTT订阅主题失败：', JSON.stringify(err))
+      console.error(`[HarmonyInference] [MQTTClient] 批量订阅主题失败: ${JSON.stringify(err)}`)
     })
     // 监听订阅主题
     this.messageArrived()
@@ -152,9 +152,9 @@ class MQTTClient {
     // 监听主题发送消息
     this.mqttClient.messageArrived((err: Error, data: MqttMessage) => {
       if (err) {
-        console.error('MQTT接收消息失败：', JSON.stringify(err))
+        console.error(`[HarmonyInference] [MQTTClient] 接收消息失败: ${JSON.stringify(err)}`)
       } else {
-        console.info('MQTT接收消息成功：', JSON.stringify(data))
+        console.info(`[HarmonyInference] [MQTTClient] 接收消息成功，主题: ${data.topic}`)
         if (data.topic == "/task/result") {
           emitter.emit({
             eventId: RESULT_EVENT_ID,
@@ -196,9 +196,9 @@ class MQTTClient {
       qos: qo,
       payload: msg
     }).then((data: MqttResponse) => {
-      console.info("MQTT消息发送成功：", JSON.stringify(data),pic)
+      console.info(`[HarmonyInference] [MQTTClient] 消息发送成功，主题: ${pic}`)
     }).catch((err: Error) => {
-      console.error("MQTT消息发送失败：", JSON.stringify(err))
+      console.error(`[HarmonyInference] [MQTTClient] 消息发送失败: ${JSON.stringify(err)}`)
     })
   }
 
@@ -209,10 +209,10 @@ class MQTTClient {
     }
     await this.mqttClient.destroy().then((data: boolean) => {
       if (data) {
-        console.info('MQTT实例销毁成功')
+        console.info(`[HarmonyInference] [MQTTClient] 实例销毁成功，资源已释放`)
         emitter.off(EVENTID)
       } else {
-        console.error('MQTT实例销毁失败')
+        console.error(`[HarmonyInference] [MQTTClient] 实例销毁失败`)
       }
     })
 

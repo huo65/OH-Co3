@@ -140,15 +140,15 @@ export class TCPTransferProtocol implements CapableProtocolInterface {
       const port = config.port || this.DEFAULT_PORT;
       const timeout = config.timeout || this.DEFAULT_TIMEOUT;
 
-      console.info(`[TCPTransferProtocol] 开始连接到 ${host}:${port}`);
+      console.info(`[HarmonyInference] [TCPTransferProtocol] 开始连接到服务器，地址: ${host}:${port}`);
 
       const connectionId = await this.socketManager.connectToServer(host, port, timeout);
 
       if (connectionId) {
-        console.info(`[TCPTransferProtocol] 连接成功，connectionId=${connectionId}`);
+        console.info(`[HarmonyInference] [TCPTransferProtocol] TCP连接成功，连接ID: ${connectionId}`);
         return createSuccessResult('connect', true);
       } else {
-        console.error('[TCPTransferProtocol] 连接失败');
+        console.error(`[HarmonyInference] [TCPTransferProtocol] TCP连接失败，地址: ${host}:${port}`);
         return createErrorResult(
           'connect',
           TransferErrorCode.CONNECTION_FAILED,
@@ -156,7 +156,7 @@ export class TCPTransferProtocol implements CapableProtocolInterface {
         );
       }
     } catch (error) {
-      console.error('[TCPTransferProtocol] 连接异常:', error);
+      console.error(`[HarmonyInference] [TCPTransferProtocol] TCP连接异常: ${error}`);
       return createErrorResult(
         'connect',
         TransferErrorCode.CONNECTION_FAILED,
@@ -170,14 +170,14 @@ export class TCPTransferProtocol implements CapableProtocolInterface {
    */
   async startServer(port: number = this.DEFAULT_PORT): Promise<TransferResult<boolean>> {
     try {
-      console.info(`[TCPTransferProtocol] 启动服务器监听，端口=${port}`);
+      console.info(`[HarmonyInference] [TCPTransferProtocol] 启动TCP服务器监听，端口: ${port}`);
       const result = await this.socketManager.startServer(port);
 
       if (result) {
-        console.info('[TCPTransferProtocol] 服务器启动成功');
+        console.info(`[HarmonyInference] [TCPTransferProtocol] TCP服务器启动成功，端口: ${port}`);
         return createSuccessResult('startServer', true);
       } else {
-        console.error('[TCPTransferProtocol] 服务器启动失败');
+        console.error(`[HarmonyInference] [TCPTransferProtocol] TCP服务器启动失败，端口: ${port}`);
         return createErrorResult(
           'startServer',
           TransferErrorCode.SERVER_START_FAILED,
@@ -185,7 +185,7 @@ export class TCPTransferProtocol implements CapableProtocolInterface {
         );
       }
     } catch (error) {
-      console.error('[TCPTransferProtocol] 服务器启动异常:', error);
+      console.error(`[HarmonyInference] [TCPTransferProtocol] TCP服务器启动异常: ${error}`);
       return createErrorResult(
         'startServer',
         TransferErrorCode.SERVER_START_FAILED,
@@ -201,18 +201,18 @@ export class TCPTransferProtocol implements CapableProtocolInterface {
    * 接收端：关闭客户端连接
    */
   async disconnect(): Promise<TransferResult<boolean>> {
-    console.info('[TCPTransferProtocol] 断开所有连接');
+    console.info(`[HarmonyInference] [TCPTransferProtocol] 开始断开所有TCP连接`);
 
     try {
       // 获取所有活动连接并关闭
       const connectionIds = this.socketManager.getConnectionIds();
       if (connectionIds.length > 0) {
-        console.info(`[TCPTransferProtocol] 关闭 ${connectionIds.length} 个活动连接`);
+        console.info(`[HarmonyInference] [TCPTransferProtocol] 正在关闭 ${connectionIds.length} 个活动连接`);
         for (const connectionId of connectionIds) {
           try {
             await this.socketManager.closeConnection(connectionId);
           } catch (closeError) {
-            console.warn(`[TCPTransferProtocol] 关闭连接 ${connectionId} 失败:`, closeError);
+            console.warn(`[HarmonyInference] [TCPTransferProtocol] 关闭连接失败，连接ID: ${connectionId}，错误: ${closeError}`);
           }
         }
       }
@@ -228,10 +228,10 @@ export class TCPTransferProtocol implements CapableProtocolInterface {
       this.receiveStates.clear();
       this.sendStates.clear();
 
-      console.info('[TCPTransferProtocol] 所有连接已断开，资源已释放');
+      console.info(`[HarmonyInference] [TCPTransferProtocol] 所有TCP连接已断开，资源已释放`);
       return createSuccessResult('disconnect', true);
     } catch (error) {
-      console.error('[TCPTransferProtocol] 断开连接失败:', error);
+      console.error(`[HarmonyInference] [TCPTransferProtocol] 断开连接失败: ${error}`);
       return createErrorResult(
         'disconnect',
         TransferErrorCode.UNKNOWN_ERROR,
@@ -295,9 +295,9 @@ export class TCPTransferProtocol implements CapableProtocolInterface {
         };
 
         await config.notifyCallback(notifyInfo);
-        console.info(`[TCPTransferProtocol] 已通知目标设备发起 TCP 连接，taskId=${taskId}`);
+        console.info(`[HarmonyInference] [TCPTransferProtocol] 已通知目标设备发起TCP连接，任务ID: ${taskId}`);
       } else {
-        console.warn(`[TCPTransferProtocol] 未提供 notifyCallback，目标设备可能无法得知需要发起连接`);
+        console.warn(`[HarmonyInference] [TCPTransferProtocol] 未提供通知回调，目标设备可能无法得知需要发起连接`);
       }
 
       // 计算文件哈希
@@ -305,7 +305,7 @@ export class TCPTransferProtocol implements CapableProtocolInterface {
 
       // 分块
       const chunks = FileUtils.chunkFile(fileData, chunkSize, taskId);
-      console.info(`[TCPTransferProtocol] 文件分块完成，总块数=${chunks.length}, 大小=${fileData.byteLength}字节`);
+      console.info(`[HarmonyInference] [TCPTransferProtocol] 文件分块完成，总块数: ${chunks.length}，文件大小: ${fileData.byteLength}字节`);
 
       // 初始化发送状态
       const sendState: SendState = {
@@ -345,7 +345,7 @@ export class TCPTransferProtocol implements CapableProtocolInterface {
       }
 
       sendState.connectionId = connectionId;
-      console.info(`[TCPTransferProtocol] 客户端已连接，connectionId=${connectionId}`);
+      console.info(`[HarmonyInference] [TCPTransferProtocol] 客户端已连接，连接ID: ${connectionId}`);
 
       // 发送握手消息
       const handshakeMessage: TCPHandshakeMessage = {
@@ -366,7 +366,7 @@ export class TCPTransferProtocol implements CapableProtocolInterface {
         );
       }
 
-      console.info(`[TCPTransferProtocol] 握手消息已发送，等待分块确认...`);
+      console.info(`[HarmonyInference] [TCPTransferProtocol] 握手消息已发送，等待分块确认...`);
 
       // 逐块发送
       for (let i = 0; i < chunks.length; i++) {
@@ -389,7 +389,7 @@ export class TCPTransferProtocol implements CapableProtocolInterface {
             break;
           }
 
-          console.warn(`[TCPTransferProtocol] 分块 ${i} 发送失败，重试 (${retry + 1}/${maxRetries})`);
+          console.warn(`[HarmonyInference] [TCPTransferProtocol] 分块发送失败，重试中，分块索引: ${i}，重试次数: ${retry + 1}/${maxRetries}`);
           await sleep(500 * (retry + 1));
         }
 
@@ -437,11 +437,11 @@ export class TCPTransferProtocol implements CapableProtocolInterface {
       // 清理发送状态
       this.sendStates.delete(taskId);
 
-      console.info(`[TCPTransferProtocol] 文件发送完成，taskId=${taskId}`);
+      console.info(`[HarmonyInference] [TCPTransferProtocol] 文件发送完成，任务ID: ${taskId}`);
       return createSuccessResult(taskId, true);
     } catch (error) {
       const transferError = errorFromException(error, TransferErrorCode.TRANSFER_FAILED);
-      console.error('[TCPTransferProtocol] 文件发送失败:', transferError.message);
+      console.error(`[HarmonyInference] [TCPTransferProtocol] 文件发送失败: ${transferError.message}`);
       this.updateProgress(taskId, TransferState.FAILED, 0, 0, 0, undefined, undefined, transferError.message);
       this.sendStates.delete(taskId);
 
@@ -460,7 +460,7 @@ export class TCPTransferProtocol implements CapableProtocolInterface {
    */
   async receive(taskId: string): Promise<TransferResult<ArrayBuffer | string>> {
     try {
-      console.info(`[TCPTransferProtocol] 开始接收文件，taskId=${taskId}`);
+      console.info(`[HarmonyInference] [TCPTransferProtocol] 开始接收文件，任务ID: ${taskId}`);
 
       // 初始化接收状态
       this.initReceiveState(taskId);
@@ -497,7 +497,7 @@ export class TCPTransferProtocol implements CapableProtocolInterface {
             `期望: ${receiveState.fileHash.substring(0, 16)}..., 实际: ${receivedHash.substring(0, 16)}...`
           );
         }
-        console.info(`[TCPTransferProtocol] 文件哈希校验通过，哈希=${receivedHash.substring(0, 16)}...`);
+        console.info(`[HarmonyInference] [TCPTransferProtocol] 文件哈希校验通过，哈希: ${receivedHash.substring(0, 16)}...`);
       }
 
       // 更新进度为完成
@@ -510,7 +510,7 @@ export class TCPTransferProtocol implements CapableProtocolInterface {
       return createSuccessResult(taskId, fileData);
     } catch (error) {
       const transferError = errorFromException(error, TransferErrorCode.RECEIVE_FAILED);
-      console.error('[TCPTransferProtocol] 文件接收失败:', transferError.message);
+      console.error(`[HarmonyInference] [TCPTransferProtocol] 文件接收失败: ${transferError.message}`);
       this.updateProgress(taskId, TransferState.FAILED, 0, 0, 0, undefined, undefined, transferError.message);
 
       // 清理资源
@@ -548,7 +548,7 @@ export class TCPTransferProtocol implements CapableProtocolInterface {
    * 取消传输任务
    */
   async cancel(taskId: string): Promise<TransferResult<boolean>> {
-    console.info(`[TCPTransferProtocol] 取消传输任务：${taskId}`);
+    console.info(`[HarmonyInference] [TCPTransferProtocol] 取消传输任务，任务ID: ${taskId}`);
 
     // 清理该任务的缓存
     this.chunkBuffers.delete(taskId);
@@ -592,7 +592,7 @@ export class TCPTransferProtocol implements CapableProtocolInterface {
       try {
         this.handleIncomingMessage(taskId, connectionId, data);
       } catch (error) {
-        console.error(`[TCPTransferProtocol] 消息处理失败，taskId=${taskId}:`, error);
+        console.error(`[HarmonyInference] [TCPTransferProtocol] 消息处理失败，任务ID: ${taskId}，错误: ${error}`);
       }
     };
   }
@@ -603,18 +603,18 @@ export class TCPTransferProtocol implements CapableProtocolInterface {
   private handleIncomingMessage(taskId: string, connectionId: string, data: ArrayBuffer): void {
     const receiveState = this.receiveStates.get(taskId);
     if (!receiveState) {
-      console.warn(`[TCPTransferProtocol] 未找到接收状态，taskId=${taskId}`);
+      console.warn(`[HarmonyInference] [TCPTransferProtocol] 未找到接收状态，任务ID: ${taskId}`);
       return;
     }
 
     // 解析消息
     const message = this.parseTCPMessage(data);
     if (!message) {
-      console.error(`[TCPTransferProtocol] 消息解析失败，taskId=${taskId}`);
+      console.error(`[HarmonyInference] [TCPTransferProtocol] 消息解析失败，任务ID: ${taskId}`);
       return;
     }
 
-    console.info(`[TCPTransferProtocol] 收到消息，type=${message.type}, taskId=${taskId}`);
+    console.info(`[HarmonyInference] [TCPTransferProtocol] 收到消息，类型: ${message.type}，任务ID: ${taskId}`);
 
     switch (message.type) {
       case TCPMessageType.HANDSHAKE:
@@ -630,7 +630,7 @@ export class TCPTransferProtocol implements CapableProtocolInterface {
         this.handleErrorMessage(taskId, message as TCPErrorMessage);
         break;
       default:
-        console.warn(`[TCPTransferProtocol] 未知消息类型，type=${message.type}`);
+        console.warn(`[HarmonyInference] [TCPTransferProtocol] 未知消息类型，类型: ${message.type}`);
     }
   }
 
@@ -647,7 +647,7 @@ export class TCPTransferProtocol implements CapableProtocolInterface {
       const headerLength = headerLengthView.getInt32(0, false);
 
       if (headerLength <= 0 || headerLength > data.byteLength - 4) {
-        console.error(`[TCPTransferProtocol] 无效的消息头长度：${headerLength}`);
+        console.error(`[HarmonyInference] [TCPTransferProtocol] 无效的消息头长度: ${headerLength}`);
         return null;
       }
 
@@ -659,7 +659,7 @@ export class TCPTransferProtocol implements CapableProtocolInterface {
 
       return header;
     } catch (error) {
-      console.error('[TCPTransferProtocol] 消息解析失败:', error);
+      console.error(`[HarmonyInference] [TCPTransferProtocol] 消息解析失败: ${error}`);
       return null;
     }
   }
@@ -707,7 +707,7 @@ export class TCPTransferProtocol implements CapableProtocolInterface {
         );
       }
     } catch (error) {
-      console.error('[TCPTransferProtocol] 消息发送失败:', error);
+      console.error(`[HarmonyInference] [TCPTransferProtocol] 消息发送失败: ${error}`);
       return createErrorResult(
         message.taskId || 'send',
         TransferErrorCode.SEND_FAILED,
@@ -727,7 +727,7 @@ export class TCPTransferProtocol implements CapableProtocolInterface {
     receiveState.totalChunks = message.totalChunks;
     receiveState.fileHash = message.fileHash;
 
-    console.info(`[TCPTransferProtocol] 握手消息已接收，taskId=${taskId}, totalChunks=${message.totalChunks}`);
+    console.info(`[HarmonyInference] [TCPTransferProtocol] 握手消息已接收，任务ID: ${taskId}，总块数: ${message.totalChunks}`);
 
     this.updateProgress(taskId, TransferState.TRANSFERRING, 0, 0, message.fileInfo.size);
   }
@@ -794,7 +794,7 @@ export class TCPTransferProtocol implements CapableProtocolInterface {
       `${message.chunkIndex}/${receiveState.totalChunks}`
     );
 
-    console.info(`[TCPTransferProtocol] 分块已接收，taskId=${taskId}, chunkIndex=${message.chunkIndex}`);
+    console.info(`[HarmonyInference] [TCPTransferProtocol] 分块已接收，任务ID: ${taskId}，分块索引: ${message.chunkIndex}`);
   }
 
   /**
@@ -807,7 +807,7 @@ export class TCPTransferProtocol implements CapableProtocolInterface {
     receiveState.fileHash = message.fileHash;
     receiveState.isComplete = true;
 
-    console.info(`[TCPTransferProtocol] 完成消息已接收，taskId=${taskId}`);
+    console.info(`[HarmonyInference] [TCPTransferProtocol] 完成消息已接收，任务ID: ${taskId}`);
 
     if (receiveState.resolve) {
       receiveState.resolve(receiveState.chunks);
@@ -818,7 +818,7 @@ export class TCPTransferProtocol implements CapableProtocolInterface {
    * 处理错误消息
    */
   private handleErrorMessage(taskId: string, message: TCPErrorMessage): void {
-    console.error(`[TCPTransferProtocol] 收到错误消息，taskId=${taskId}, error=${message.errorMessage}`);
+    console.error(`[HarmonyInference] [TCPTransferProtocol] 收到错误消息，任务ID: ${taskId}，错误信息: ${message.errorMessage}`);
 
     const receiveState = this.receiveStates.get(taskId);
     if (receiveState && receiveState.reject) {

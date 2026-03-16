@@ -57,7 +57,7 @@ class SystemProfiler{
         combinedInfo.set(key, value);
       });
     } catch (error) {
-      console.error(`getDeviceInfos error: ${error.message}`);
+      console.error(`[HarmonyInference] [SystemProfiler] 获取设备信息失败: ${error.message}`);
     }
 
 
@@ -90,7 +90,7 @@ class SystemProfiler{
       const rawValue = cpuUsage as number;
       this.ownInfo.cpuUsage = Math.round(rawValue * 10000) / 100;
     } catch (error) {
-      console.error(`CPU info error: ${error.message}`);
+      console.error(`[HarmonyInference] [SystemProfiler] 获取CPU信息失败: ${error.message}`);
     }
   }
   getMemoryInfo(){
@@ -104,7 +104,7 @@ class SystemProfiler{
       const rawValue = statfs.getFreeSizeSync(context.filesDir) / statfs.getTotalSizeSync(context.filesDir);
       this.ownInfo.storageFree = Math.round(rawValue * 10000) / 100;
     } catch (error) {
-      console.error(`storage info error: ${error.message}`);
+      console.error(`[HarmonyInference] [SystemProfiler] 获取存储信息失败: ${error.message}`);
     }
   }
 
