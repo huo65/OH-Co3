@@ -52,12 +52,12 @@ class ImageIdModelManager implements InferenceWorker {
     this.isInit = true;
 }
 
-  async processImage(uri: string): Promise<ArrayBuffer> {
+  async processImage(buffer: ArrayBuffer): Promise<ArrayBuffer> {
     try {
-      const resourceManager = getContext().getApplicationContext().resourceManager;
-      // TODO 临时直接指定本地的url
-      const fileData = await resourceManager.getMediaContent($r('app.media.dog'));
-      const imageSource = image.createImageSource(fileData.buffer);
+      // const resourceManager = getContext().getApplicationContext().resourceManager;
+      // // TODO 临时直接指定本地的url
+      // const fileData = await resourceManager.getMediaContent($r('app.media.dog'));
+      const imageSource = image.createImageSource(buffer);
       const pixelMap = await imageSource.createPixelMap();
 
       // 图片预处理
@@ -215,7 +215,7 @@ class ImageIdModelManager implements InferenceWorker {
     // 处理输入
     if (task.type === InferenceInputType.IMAGE) {
       let imageData = task.data as ImageInputData;
-      processedData = await this.processImage(imageData.imageData);
+      processedData = await this.processImage(imageData.buffer);
     } else {
       // 类型不匹配
       return {

@@ -1,13 +1,14 @@
 import { InferenceTask } from '../../HarmonyInferenceClient';
 import { GlobalTaskManager } from '../../worker/GlobalTaskManager';
 import { InferenceResult, InferenceInputType, ImageInputData } from '../../worker/InferenceWorker';
+import { FileTransferManager, TransferNotifyCallback } from '../../transfer/FileTransferManager';
 import { ownName } from '../monitor/NodeInfoSyn';
 import { MQTTClient } from '../MQTTClient'
 import { systemDateTime } from '@kit.BasicServicesKit';
-import { FileTransferManager, TransferNotifyCallback } from '../../transfer/FileTransferManager';
 import { FileUtils } from '../../transfer/utils/FileUtils';
 import { FileInfo } from '../../transfer/model/TransferDataModels';
 import { TCPNotifyInfo } from '../../transfer/model/TCPModels';
+import { InferenceDataUtils } from '../../worker/InferenceDataUtils';
 
 
 /**
@@ -55,7 +56,12 @@ class TaskTransmitData {
     this.fromClient = "";
     this.toClient = "";
     this.timestamp = 0;
-    this.params = {taskId:"", modelName:"", type: InferenceInputType.IMAGE, data: { imageData: "" } };
+    const emptyBuffer = new ArrayBuffer(0);
+    const imageData: ImageInputData = {
+      type: InferenceInputType.IMAGE,
+      buffer: emptyBuffer
+    };
+    this.params = {taskId:"", modelName:"", type: InferenceInputType.IMAGE, data: imageData };
     this.sourceDevice = undefined;
     this.transferType = 'direct';
     this.fileHash = undefined;
@@ -145,7 +151,12 @@ class TaskDispatch{
           // 将通用通知信息转换为 TCP 特有类型
           const tcpNotifyInfo: TCPNotifyInfo = notifyInfo as TCPNotifyInfo;
           taskInfo.transferType = 'TCP';
-          taskInfo.params.data = '';
+          // 清空数据，使用空的 ImageInputData
+          const emptyImageData: ImageInputData = {
+            type: InferenceInputType.IMAGE,
+            buffer: new ArrayBuffer(0)
+          };
+          taskInfo.params.data = emptyImageData;
           taskInfo.sourceDevice = tcpNotifyInfo.sourceIp;
           const taskInfoMessage = JSON.stringify(taskInfo);
           await MQTTInstance.pushMessage(taskInfoMessage, '/task/assign');
@@ -181,11 +192,11 @@ class TaskDispatch{
   private extractFileData(task: InferenceTask): ArrayBuffer | null {
     if (task.type === InferenceInputType.IMAGE) {
       const imageDataObj: ImageInputData = task.data as ImageInputData;
-      const base64: string = imageDataObj.imageData || '';
-      if (!base64) {
+      const buffer: ArrayBuffer = imageDataObj.buffer;
+      if (!buffer || buffer.byteLength === 0) {
         return null;
       }
-      return FileUtils.base64ToArrayBuffer(base64);
+      return buffer;
     }
     return null;
   }
@@ -196,15 +207,8 @@ class TaskDispatch{
    * @returns 数据大小（字节）
    */
   private estimateDataSize(task: InferenceTask): number {
-    // 简单估算：根据 imageData 或其他数据字段的大小
     console.info(`[TaskDispatch] 文件类型 type=${task.type}`);
-    if (task.type === InferenceInputType.IMAGE) {
-      const imageDataObj: ImageInputData = task.data as ImageInputData;
-      const imageData: string = imageDataObj.imageData || '';
-      return imageData.length;
-    }
-    // TODO　封装一个通用工具类
-    return 0;
+    return InferenceDataUtils.estimateInputDataSize(task.data);
   }
 
   /**
@@ -245,7 +249,8 @@ class TaskDispatch{
         if (fileResult.success && fileResult.data instanceof ArrayBuffer) {
           if (taskInfo.params.type === InferenceInputType.IMAGE) {
             const imageDataObj: ImageInputData = {
-              imageData: FileUtils.arrayBufferToBase64(fileResult.data)
+              type: InferenceInputType.IMAGE,
+              buffer: fileResult.data
             };
             taskInfo.params.data = imageDataObj;
           }

@@ -1,16 +1,16 @@
 // 推理任务参数
 export interface InferenceTask {
-  // 任务相关字段
   taskId: string;
   modelName?: string;
 
-  // 推理输入字段
+  // 保持 type 字段，方便旧代码读取，也方便日志
   type: InferenceInputType;
-  data: ImageInputData | TextInputData | AudioInputData | ArrayBuffer | '';
+
+  // 规范化之后的核心数据结构
+  data: InferenceInputData;
+
   params?: Record<string, string | number | boolean | ArrayBuffer>;
-
 }
-
 // 推理任务输入类型枚举
 export enum InferenceInputType {
   IMAGE = 'image',
@@ -19,23 +19,60 @@ export enum InferenceInputType {
   VIDEO = 'video',
   OTHER = 'other'
 }
-
-// 图像输入数据类型
-export interface ImageInputData {
-  imageData: string; // 图像数据
+export interface BaseInputData {
+  /** 与枚举一一对应，作为联合类型的判别字段 */
+  type: InferenceInputType;
 }
 
-// 文本输入数据类型
-export interface TextInputData {
-  text: string; // 文本内容
+/** 图像输入：强制使用二进制数据 */
+export interface ImageInputData extends BaseInputData {
+  type: InferenceInputType.IMAGE;
+  buffer: ArrayBuffer;
+  /** 可选：原始格式、宽高等元信息 */
+  format?: string;
+  width?: number;
+  height?: number;
 }
 
-// 音频输入数据类型
-export interface AudioInputData {
-  buffer: ArrayBuffer; // 音频数据缓冲区
-  sampleRate: number; // 采样率
-  channels: number; // 声道数
+/** 文本输入 */
+export interface TextInputData extends BaseInputData {
+  type: InferenceInputType.TEXT;
+  text: string;
+  /** 可选：编码信息，例如 'utf-8' */
+  encoding?: string;
 }
+
+/** 音频输入 */
+export interface AudioInputData extends BaseInputData {
+  type: InferenceInputType.AUDIO;
+  buffer: ArrayBuffer;
+  sampleRate: number;
+  channels: number;
+}
+
+/** 视频输入 */
+export interface VideoInputData extends BaseInputData {
+  type: InferenceInputType.VIDEO;
+  buffer: ArrayBuffer;
+  /** 可选：帧率、分辨率等 */
+  fps?: number;
+}
+
+/** 其他自定义二进制输入 */
+export interface OtherInputData extends BaseInputData {
+  type: InferenceInputType.OTHER;
+  buffer: ArrayBuffer;
+  metadata?: string;
+}
+
+/** 统一的规范化输入数据联合类型 */
+export type InferenceInputData =
+  | ImageInputData
+    | TextInputData
+    | AudioInputData
+    | VideoInputData
+    | OtherInputData;
+
 
 // 推理结果类型
 export interface InferenceResult {
