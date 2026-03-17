@@ -20,13 +20,11 @@
 
 ## 更新摘要
 **变更内容**
-- 新增 TCP 粘包/拆包处理机制，实现完整的缓冲区管理
-- 增强消息解析算法，支持可靠的消息边界识别
-- 完善错误处理和超时机制，提升传输稳定性
-- 优化资源管理，增强连接生命周期控制
-- 新增断点续传能力查询支持
-- 改进性能监控和进度跟踪
-- **性能优化**：注释掉昂贵的计算逻辑以提升传输效率
+- **大规模日志改进**：TCPTransferProtocol 模块新增全面的操作日志记录，涵盖连接建立、服务器启动、分块传输、进度跟踪和错误处理的详细记录
+- **统一日志格式**：采用标准化的日志格式 `[HarmonyInference] [TCPTransferProtocol]`，便于日志分析和调试
+- **性能优化保持**：保留可选的昂贵计算逻辑注释，支持不同性能需求的场景
+- **增强的错误处理日志**：完善了错误处理和超时机制的日志记录
+- **改进的资源管理日志**：在断开连接时自动清理资源的日志记录
 
 ## 目录
 1. [简介](#简介)
@@ -34,10 +32,11 @@
 3. [核心组件](#核心组件)
 4. [架构概览](#架构概览)
 5. [详细组件分析](#详细组件分析)
-6. [依赖关系分析](#依赖关系分析)
-7. [性能考虑](#性能考虑)
-8. [故障排除指南](#故障排除指南)
-9. [结论](#结论)
+6. [日志系统分析](#日志系统分析)
+7. [依赖关系分析](#依赖关系分析)
+8. [性能考虑](#性能考虑)
+9. [故障排除指南](#故障排除指南)
+10. [结论](#结论)
 
 ## 简介
 
@@ -52,7 +51,9 @@ TCP 传输协议是基于 OpenHarmony 平台开发的一套文件传输解决方
 - **TCP 粘包/拆包处理**：实现了可靠的缓冲区管理和消息边界识别
 - **增强的消息解析算法**：支持大端序消息头长度解析和完整性验证
 - **完善的错误处理机制**：包含超时处理、重试策略和资源清理
-- **性能优化**：注释掉昂贵的计算逻辑以提升传输效率
+- ****大规模日志改进**：新增全面的操作日志记录，涵盖连接建立、服务器启动、分块传输、进度跟踪和错误处理的详细记录
+- **统一日志格式**：采用标准化的日志格式 `[HarmonyInference] [TCPTransferProtocol]`，便于日志分析和调试
+- **性能优化保持**：保留可选的昂贵计算逻辑注释，支持不同性能需求的场景
 
 该协议的核心优势包括：
 - **大文件支持**：专为大文件传输优化，支持任意大小的文件传输
@@ -63,6 +64,7 @@ TCP 传输协议是基于 OpenHarmony 平台开发的一套文件传输解决方
 - **缓冲区管理**：智能处理 TCP 粘包/拆包问题，确保消息完整性
 - **错误恢复**：完善的错误检测和恢复机制
 - **性能优化**：通过注释昂贵的计算逻辑显著提升传输效率
+- ****全面日志记录**：在各个关键操作节点提供详细的日志输出，便于调试和监控
 
 ## 项目结构
 
@@ -553,6 +555,119 @@ const estimatedTime = 0;
 - [TCPTransferProtocol.ets:407-420](file://entry/src/main/ets/manager/transfer/protocol/TCPTransferProtocol.ets#L407-L420)
 - [TCPTransferProtocol.ets:768-795](file://entry/src/main/ets/manager/transfer/protocol/TCPTransferProtocol.ets#L768-L795)
 
+## 日志系统分析
+
+**更新** 新增了全面的日志系统分析，这是本次变更的核心改进之一。
+
+### 日志系统架构
+
+TCP 传输协议实现了全面的日志记录系统，覆盖了传输过程的所有关键环节：
+
+```mermaid
+graph TB
+subgraph "日志级别"
+INFO[信息日志]
+WARN[警告日志]
+ERROR[错误日志]
+DEBUG[调试日志]
+end
+subgraph "日志位置"
+CONNECT[连接建立]
+SERVER[服务器启动]
+SEND[发送操作]
+RECEIVE[接收操作]
+PROGRESS[进度跟踪]
+ERROR[错误处理]
+end
+subgraph "日志格式"
+FORMAT[[HarmonyInference] [TCPTransferProtocol]]
+end
+INFO --> FORMAT
+WARN --> FORMAT
+ERROR --> FORMAT
+DEBUG --> FORMAT
+CONNECT --> INFO
+SERVER --> INFO
+SEND --> INFO
+RECEIVE --> INFO
+PROGRESS --> INFO
+ERROR --> ERROR
+```
+
+**图表来源**
+- [TCPTransferProtocol.ets:143-165](file://entry/src/main/ets/manager/transfer/protocol/TCPTransferProtocol.ets#L143-L165)
+- [TCPTransferProtocol.ets:173-194](file://entry/src/main/ets/manager/transfer/protocol/TCPTransferProtocol.ets#L173-L194)
+- [TCPTransferProtocol.ets:204-241](file://entry/src/main/ets/manager/transfer/protocol/TCPTransferProtocol.ets#L204-L241)
+
+### 日志记录策略
+
+**统一日志格式**：
+所有日志都采用统一的格式：`[HarmonyInference] [TCPTransferProtocol] [日志内容]`
+
+**关键操作日志**：
+- **连接建立**：记录连接地址、连接ID、连接状态
+- **服务器启动**：记录端口、启动状态、监听状态
+- **发送操作**：记录任务ID、分块索引、传输进度
+- **接收操作**：记录任务ID、分块索引、接收状态
+- **进度跟踪**：记录传输百分比、已传输字节、总字节
+- **错误处理**：记录错误类型、错误信息、错误码
+
+**日志内容示例**：
+- `[HarmonyInference] [TCPTransferProtocol] 开始连接到服务器，地址: localhost:8888`
+- `[HarmonyInference] [TCPTransferProtocol] TCP连接成功，连接ID: conn_123456789`
+- `[HarmonyInference] [TCPTransferProtocol] 文件分块完成，总块数: 100，文件大小: 1048576字节`
+- `[HarmonyInference] [TCPTransferProtocol] 分块已接收，任务ID: task_987654321，分块索引: 42`
+
+### 日志分类与用途
+
+**信息日志（INFO）**：
+- 传输开始和结束
+- 连接状态变化
+- 服务器状态变化
+- 进度更新
+- 成功的操作完成
+
+**警告日志（WARN）**：
+- 连接超时
+- 重试操作
+- 资源清理警告
+- 性能优化提示
+
+**错误日志（ERROR）**：
+- 连接失败
+- 传输失败
+- 服务器启动失败
+- 消息解析失败
+- 超时错误
+
+**日志分析价值**：
+- **调试支持**：提供完整的传输轨迹
+- **性能监控**：跟踪传输性能指标
+- **故障诊断**：快速定位问题原因
+- **审计追踪**：记录所有关键操作
+
+### 日志系统集成
+
+**与事件系统的集成**：
+日志系统与事件系统协同工作，既提供实时的日志输出，又通过事件系统提供结构化的事件数据。
+
+**与进度系统的集成**：
+日志系统与进度跟踪系统紧密集成，确保每次进度更新都有相应的日志记录。
+
+**与错误处理系统的集成**：
+日志系统与错误处理系统配合，确保所有错误都有详细的日志记录，便于问题排查。
+
+**章节来源**
+- [TCPTransferProtocol.ets:143-165](file://entry/src/main/ets/manager/transfer/protocol/TCPTransferProtocol.ets#L143-L165)
+- [TCPTransferProtocol.ets:173-194](file://entry/src/main/ets/manager/transfer/protocol/TCPTransferProtocol.ets#L173-L194)
+- [TCPTransferProtocol.ets:204-241](file://entry/src/main/ets/manager/transfer/protocol/TCPTransferProtocol.ets#L204-L241)
+- [TCPTransferProtocol.ets:308](file://entry/src/main/ets/manager/transfer/protocol/TCPTransferProtocol.ets#L308)
+- [TCPTransferProtocol.ets:348](file://entry/src/main/ets/manager/transfer/protocol/TCPTransferProtocol.ets#L348)
+- [TCPTransferProtocol.ets:440](file://entry/src/main/ets/manager/transfer/protocol/TCPTransferProtocol.ets#L440)
+- [TCPTransferProtocol.ets:500](file://entry/src/main/ets/manager/transfer/protocol/TCPTransferProtocol.ets#L500)
+- [TCPTransferProtocol.ets:810](file://entry/src/main/ets/manager/transfer/protocol/TCPTransferProtocol.ets#L810)
+- [TCPTransferProtocol.ets:821](file://entry/src/main/ets/manager/transfer/protocol/TCPTransferProtocol.ets#L821)
+
 ## 依赖关系分析
 
 ### 组件依赖图
@@ -668,6 +783,12 @@ end
 - **批量处理**：减少频繁的计算操作
 - **内存复用**：重用计算结果避免重复计算
 
+**日志系统优化**：
+- **统一格式**：标准化日志格式便于分析
+- **分级记录**：不同级别的日志对应不同的严重程度
+- **关键信息**：日志内容包含任务ID、进度、错误码等关键信息
+- **性能考虑**：日志记录不影响主要传输性能
+
 **章节来源**
 - [TCPTransferProtocol.ets:203-241](file://entry/src/main/ets/manager/transfer/protocol/TCPTransferProtocol.ets#L203-L241)
 - [FileTransferManager.ets:274-286](file://entry/src/main/ets/manager/transfer/FileTransferManager.ets#L274-L286)
@@ -696,6 +817,11 @@ end
 - 验证消息头长度解析
 - 确认消息边界识别逻辑
 
+**日志分析问题**：
+- 检查日志级别设置
+- 验证日志格式正确性
+- 分析日志时间线
+
 **性能优化问题**：
 - 检查是否启用了昂贵的计算逻辑
 - 验证注释状态
@@ -712,6 +838,11 @@ end
 - 监控传输速度变化
 - 分析内存使用趋势
 - 评估系统资源占用
+
+**日志过滤**：
+- 使用任务ID过滤日志
+- 按操作类型筛选日志
+- 分析错误日志模式
 
 ### 最佳实践
 
@@ -740,6 +871,12 @@ end
 - 设置缓冲区大小限制
 - 实现缓冲区溢出保护
 
+**日志管理**：
+- 合理设置日志级别
+- 定期清理历史日志
+- 建立日志分析流程
+- 使用统一的日志格式
+
 **性能优化**：
 - 根据应用场景选择合适的优化策略
 - 监控性能指标的变化
@@ -760,6 +897,7 @@ Tcp 传输协议是一个设计精良、实现完整的文件传输解决方案�
 - **粘包处理**：智能的缓冲区管理和消息边界识别
 - **错误恢复**：完善的错误检测和恢复机制
 - **性能优化**：通过注释昂贵的计算逻辑显著提升传输效率
+- ****全面日志系统**：新增的统一日志记录系统，提供完整的操作轨迹和调试支持
 
 **技术亮点**：
 - 采用分层架构设计，职责清晰，耦合度低
@@ -770,6 +908,14 @@ Tcp 传输协议是一个设计精良、实现完整的文件传输解决方案�
 - 增强了资源管理和错误处理机制
 - 实现了可靠的 TCP 粘包/拆包处理
 - 完善了消息序列化和反序列化机制
-- **性能优化**：通过可选的昂贵计算逻辑注释，为不同场景提供灵活的性能配置
+- ****大规模日志改进**：新增全面的操作日志记录，采用统一的标准化格式，涵盖连接建立、服务器启动、分块传输、进度跟踪和错误处理的详细记录
+- ****性能优化保持**：通过可选的昂贵计算逻辑注释，为不同场景提供灵活的性能配置
 
-该协议不仅满足了当前的传输需求，还为未来的功能扩展和技术演进奠定了坚实的基础，是一个值得学习和参考的优秀开源项目。
+**日志系统价值**：
+- **调试支持**：提供完整的传输轨迹，便于问题诊断
+- **性能监控**：实时跟踪传输性能指标
+- **故障诊断**：快速定位问题原因和传播路径
+- **审计追踪**：记录所有关键操作，支持合规性要求
+- **运维支持**：为系统运维提供详细的操作记录
+
+该协议不仅满足了当前的传输需求，还为未来的功能扩展和技术演进奠定了坚实的基础，是一个值得学习和参考的优秀开源项目。特别是新增的日志系统改进，为整个项目的可维护性和可调试性提供了重要保障。

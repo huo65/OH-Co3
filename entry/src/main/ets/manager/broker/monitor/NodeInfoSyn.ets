@@ -117,7 +117,7 @@ class NodeInfoSyn{
 
         this.otherNodeInfo.push(newNodeInfo);
       } else {
-        console.info(`[HarmonyInference] [NodeInfoSyn] 忽略本设备自身状态广播`);
+        // console.info(`[HarmonyInference] [NodeInfoSyn] 忽略本设备自身状态广播`);
       }
     } catch (e) {
       console.error(`[HarmonyInference] [NodeInfoSyn] 解析节点信息消息失败: ${e}`);
