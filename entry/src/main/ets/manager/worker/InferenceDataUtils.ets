@@ -10,7 +10,7 @@ export class InferenceDataUtils {
       const text: string = input.text;
       return InferenceDataUtils.estimateStringSize(text);
     }else {
-      // TODO 待测试
+
       return input.buffer.byteLength;
     }
 

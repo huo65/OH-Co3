@@ -1,6 +1,6 @@
 import { EVENTID, MQTTClient, MQTTOptionsType, RESULT_EVENT_ID } from './broker/MQTTClient';
 import { MqttQos } from '@ohos/mqtt';
-import { Scheduler } from './scheduler/Scheduler';
+import { Scheduler, SchedulerTaskStatus, TaskScheduleStatus, TaskTransitionRecord } from './scheduler/Scheduler';
 import { ModelManager } from '../TestImageTask/ImageIdModelManager';
 import { InferenceWorker, InferenceTask, InferenceResult } from './worker/InferenceWorker';
 import { GlobalTaskManager } from './worker/GlobalTaskManager';
@@ -39,13 +39,6 @@ export interface SystemStatus {
   allDevices: HashMap<string, DeviceInfo>;    // 所有设备状态（当前设备+其他设备）
 }
 
-// 任务执行状态类型
-export interface TaskStatus {
-  taskId: string;
-  status: 'pending' | 'running' | 'completed' | 'failed';
-  result?: InferenceResult;
-  error?: string;
-}
 
 
 
@@ -60,9 +53,6 @@ class HarmonyInferenceClient {
   private isInitialized: boolean = false;
   // 在类中添加定时器ID的成员变量
   private syncIntervalId: number | null = null;
-  //TODO 后续拓展任务状态监控（放在Schedule
-  private taskStatusMap: Map<string, TaskStatus> = new Map();
-
   private taskResultMap: Map<string, InferenceResult> = new Map();
 
   // 私有构造函数
@@ -299,13 +289,68 @@ class HarmonyInferenceClient {
   }
 
   // ####----------------------------------@任务处理@----------------------------------####
-  // 获取任务状态
-  public getTaskStatus(taskId: string): TaskStatus | undefined {
-    return this.taskStatusMap.get(taskId);
+  
+  /**
+   * 获取任务状态
+   * 优先从 Scheduler 获取详细的调度状态，如果不存在则返回本地缓存状态
+   * @param taskId - 任务唯一标识
+   * @returns 任务状态信息
+   */
+  public getTaskStatus(taskId: string): SchedulerTaskStatus | undefined {
+    // 优先从 Scheduler 获取详细状态
+    const schedulerStatus = this.scheduler.getTaskStatus(taskId);
+    if (schedulerStatus) {
+      return schedulerStatus;
+    }
+    return undefined;
   }
 
-  public getAllTaskStatus(): Map<string, TaskStatus> {
-    return new Map(this.taskStatusMap);
+  /**
+   * 获取所有任务状态
+   * 合并 Scheduler 中的调度状态和本地缓存状态
+   * @returns 所有任务状态的Map
+   */
+  public getAllTaskStatus(): Map<string, SchedulerTaskStatus> {
+    const result = new Map<string, SchedulerTaskStatus>();
+    
+    // 从 Scheduler 获取所有调度状态
+    const schedulerStatuses = this.scheduler.getAllTaskStatus();
+    schedulerStatuses.forEach((status, taskId) => {
+      result.set(taskId, status);
+    });
+    
+    return result;
+  }
+
+  /**
+   * 获取任务的流转历史记录
+   * @param taskId - 任务唯一标识
+   * @returns 流转历史记录数组
+   */
+  public getTaskTransitionHistory(taskId: string): Array<TaskTransitionRecord> | undefined {
+    return this.scheduler.getTaskTransitionHistory(taskId);
+  }
+
+
+  /**
+   * 注册任务状态变更监听器
+   * @param listener - 状态变更回调函数
+   */
+  public addTaskStatusListener(listener: (taskId: string, status: SchedulerTaskStatus) => void): void {
+    // 包装监听器以转换状态格式
+    const wrappedListener = (taskId: string, schedulerStatus: SchedulerTaskStatus) => {
+      listener(taskId, schedulerStatus);
+    };
+    this.scheduler.addStatusListener(wrappedListener);
+  }
+
+  /**
+   * 清理已完成的任务记录
+   * @param maxAge - 最大保留时间（毫秒），默认1小时
+   * @returns 清理的任务数量
+   */
+  public cleanupCompletedTasks(maxAge: number = 3600000): number {
+    return this.scheduler.cleanupCompletedTasks(maxAge);
   }
 
   private handleTaskResult(resultData: string): void {
@@ -314,7 +359,14 @@ class HarmonyInferenceClient {
       const taskResult:TaskResTransmitData | null = taskDispatch.parseResultMessage(resultData);
       if (taskResult != null) {
         console.info(`[HarmonyInference] [Client] 任务结果已存入结果映射表，任务ID: ${taskResult.taskId}`);
-        this.taskResultMap.set(taskResult.taskId,taskResult.params);
+        
+        // 更新 Scheduler 中的任务状态为已完成
+        this.scheduler.updateRemoteTaskStatus(
+          taskResult.taskId,
+          taskResult.params.success,
+          taskResult.params,
+          taskResult.params.success ? undefined : taskResult.params.message
+        );
       }
 
     } catch (error) {
@@ -328,6 +380,8 @@ class HarmonyInferenceClient {
       throw new Error('HarmonyInferenceClient is not initialized');
     }
 
+    const taskId: string = task.taskId as string;
+
     try {
       // 使用调度器处理任务
       const logMessages: string[] = [];
@@ -339,10 +393,30 @@ class HarmonyInferenceClient {
       if (shouldExecuteLocally) {
         // 本地执行推理，添加到全局任务队列
         console.info(`[HarmonyInference] [Client] 任务将在本地执行，添加到任务队列`);
-        const result = await GlobalTaskManager.getQueue().addTask(task);
-        return result;
+        try {
+          const result = await GlobalTaskManager.getQueue().addTask(task);
+          
+          // 更新本地任务执行状态为完成
+          this.scheduler.updateLocalTaskStatus(
+            taskId,
+            result.success,
+            result,
+            result.success ? undefined : result.message
+          );
+          
+          return result;
+        } catch (error) {
+          // 更新本地任务执行状态为失败
+          const errorMsg = error instanceof Error ? error.message : String(error);
+          this.scheduler.updateLocalTaskStatus(
+            taskId,
+            false,
+            undefined,
+            errorMsg
+          );
+          throw new Error(errorMsg);
+        }
       } else {
-        const taskId:string = task.taskId as string;
         console.info(`[HarmonyInference] [Client] 任务已分发，等待远程结果，任务ID: ${taskId}`);
         // 任务已发送到其他设备，需要等待结果
         return new Promise((resolve, reject) => {
@@ -352,12 +426,21 @@ class HarmonyInferenceClient {
               clearInterval(checkInterval);
               this.taskResultMap.delete(taskId);
               console.info(`[HarmonyInference] [Client] 收到远程任务结果，任务ID: ${taskId}，执行状态: ${result.success}`);
+              
+              // 远程任务状态已在 handleTaskResult 中更新
               resolve(result);
             }
           }, 100); // 每100ms检查一次结果
 
           setTimeout(() => {
             clearInterval(checkInterval);
+            // 超时更新任务状态为失败
+            this.scheduler.updateRemoteTaskStatus(
+              taskId,
+              false,
+              undefined,
+              '任务执行超时（30秒）'
+            );
             reject(new Error('Task timeout after 30 seconds'));
           }, 30000);
         });

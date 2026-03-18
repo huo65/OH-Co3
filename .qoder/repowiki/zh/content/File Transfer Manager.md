@@ -222,7 +222,7 @@ end
 subgraph "协议实现层"
 subgraph "MQTT协议"
 MQI[MQTTTransferProtocol]
-MQC[MQTT]
+MQC[MQTTClient]
 end
 subgraph "TCP协议"
 TPI[TCPTransferProtocol]
