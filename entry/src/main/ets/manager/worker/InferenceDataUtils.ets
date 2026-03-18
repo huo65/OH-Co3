@@ -4,7 +4,10 @@ export class InferenceDataUtils {
   /**
    * 估算统一数据结构的大小
    */
-  static estimateInputDataSize(input: InferenceInputData): number {
+  static estimateInputDataSize(input: InferenceInputData | undefined): number {
+    if(input == undefined){
+      return 0;
+    }
     if (input.type === InferenceInputType.TEXT) {
       // 文本：根据字符数估算（这里用 UTF-8 简单估算）
       const text: string = input.text;
@@ -14,13 +17,6 @@ export class InferenceDataUtils {
       return input.buffer.byteLength;
     }
 
-    // 其他类型都用二进制 buffer 长度
-    // if (InferenceDataUtils.isBufferInput(input)) {
-    //   return input.buffer.byteLength;
-    // }
-
-    // 理论上不会走到这里
-    return 0;
   }
 
   private static isBufferInput(input: InferenceInputData): boolean {

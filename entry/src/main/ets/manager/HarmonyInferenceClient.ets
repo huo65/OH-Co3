@@ -1,6 +1,6 @@
 import { EVENTID, MQTTClient, MQTTOptionsType, RESULT_EVENT_ID } from './broker/MQTTClient';
 import { MqttQos } from '@ohos/mqtt';
-import { Scheduler, SchedulerTaskStatus, TaskScheduleStatus, TaskTransitionRecord } from './scheduler/Scheduler';
+import { Scheduler, SchedulerTaskStatus, TaskScheduleStatus, TaskTransitionRecord, SchedulerRetryConfig, SchedulerFailureType } from './scheduler/Scheduler';
 import { ModelManager } from '../TestImageTask/ImageIdModelManager';
 import { InferenceWorker, InferenceTask, InferenceResult } from './worker/InferenceWorker';
 import { GlobalTaskManager } from './worker/GlobalTaskManager';
@@ -54,6 +54,15 @@ class HarmonyInferenceClient {
   // 在类中添加定时器ID的成员变量
   private syncIntervalId: number | null = null;
   private taskResultMap: Map<string, InferenceResult> = new Map();
+  /**
+   * 待处理任务映射表
+   * 缓存原始任务数据，用于远程任务失败时重试
+   */
+  private pendingTaskMap: Map<string, InferenceTask> = new Map();
+  /**
+   * 重试状态监听器ID
+   */
+  private retryListenerId: number | null = null;
 
   // 私有构造函数
   private constructor() {
@@ -174,6 +183,9 @@ class HarmonyInferenceClient {
       // 初始化全局任务队列
       GlobalTaskManager.init(this.worker);
 
+      // 设置重试回调
+      this.setupRetryCallback();
+
       // 启动设备状态同步
       this.startDeviceStatusSync();
 
@@ -192,6 +204,9 @@ class HarmonyInferenceClient {
 
     try {
       this.stopDeviceStatusSync();
+
+      // 清理重试资源
+      this.cleanupRetryResources();
 
       // 关闭MQTT连接
       if (this.mqttClient) {
@@ -358,15 +373,33 @@ class HarmonyInferenceClient {
       console.info(`[HarmonyInference] [Client] 开始处理任务结果`);
       const taskResult:TaskResTransmitData | null = taskDispatch.parseResultMessage(resultData);
       if (taskResult != null) {
-        console.info(`[HarmonyInference] [Client] 任务结果已存入结果映射表，任务ID: ${taskResult.taskId}`);
+        const taskId = taskResult.taskId;
+        const result = taskResult.params;
+        console.info(`[HarmonyInference] [Client] 收到远程任务结果，任务ID: ${taskId}, 成功: ${result.success}`);
         
-        // 更新 Scheduler 中的任务状态为已完成
+        // 检查是否是重试的远程任务
+        const wasRetryTask = this.pendingTaskMap.has(taskId);
+        
+        // 清理待处理任务映射（无论成功或失败）
+        this.pendingTaskMap.delete(taskId);
+        
+        // 将结果存入映射表，供等待的 Promise 使用
+        this.taskResultMap.set(taskId, result);
+        
+        // 更新 Scheduler 中的远程任务状态
+        // 这是统一的状态管理入口，确保状态一致性
         this.scheduler.updateRemoteTaskStatus(
-          taskResult.taskId,
-          taskResult.params.success,
-          taskResult.params,
-          taskResult.params.success ? undefined : taskResult.params.message
+          taskId,
+          result.success,
+          result,
+          result.success ? undefined : result.message
         );
+        
+        // 如果是重试任务，通知 Scheduler 重试完成
+        if (wasRetryTask) {
+          this.scheduler.notifyRetryComplete(taskId);
+          console.info(`[HarmonyInference] [Client] 重试的远程任务结果已处理: ${taskId}`);
+        }
       }
 
     } catch (error) {
@@ -396,28 +429,34 @@ class HarmonyInferenceClient {
         try {
           const result = await GlobalTaskManager.getQueue().addTask(task);
           
-          // 更新本地任务执行状态为完成
-          this.scheduler.updateLocalTaskStatus(
-            taskId,
-            result.success,
-            result,
-            result.success ? undefined : result.message
-          );
-          
-          return result;
+          if (result.success) {
+            // 更新本地任务执行状态为完成
+            this.scheduler.updateLocalTaskStatus(
+              taskId,
+              true,
+              result,
+              undefined
+            );
+            return result;
+          } else {
+            // 本地执行失败，触发重试
+            const errorMsg = result.message || '本地执行失败';
+            console.warn(`[HarmonyInference] [Client] 本地任务执行失败，准备重试: ${errorMsg}`);
+            this.scheduler.handleLocalExecutionFailure(taskId, errorMsg);
+            throw new Error(errorMsg);
+          }
         } catch (error) {
-          // 更新本地任务执行状态为失败
+          // 本地执行异常，触发重试
           const errorMsg = error instanceof Error ? error.message : String(error);
-          this.scheduler.updateLocalTaskStatus(
-            taskId,
-            false,
-            undefined,
-            errorMsg
-          );
+          console.warn(`[HarmonyInference] [Client] 本地任务执行异常，准备重试: ${errorMsg}`);
+          this.scheduler.handleLocalExecutionFailure(taskId, errorMsg);
           throw new Error(errorMsg);
         }
       } else {
         console.info(`[HarmonyInference] [Client] 任务已分发，等待远程结果，任务ID: ${taskId}`);
+        // 缓存原始任务，用于远程失败时重试
+        this.pendingTaskMap.set(taskId, task);
+        
         // 任务已发送到其他设备，需要等待结果
         return new Promise((resolve, reject) => {
           const checkInterval = setInterval(() => {
@@ -425,24 +464,34 @@ class HarmonyInferenceClient {
             if (result !== undefined && result !== null) {
               clearInterval(checkInterval);
               this.taskResultMap.delete(taskId);
+              this.pendingTaskMap.delete(taskId);
               console.info(`[HarmonyInference] [Client] 收到远程任务结果，任务ID: ${taskId}，执行状态: ${result.success}`);
               
-              // 远程任务状态已在 handleTaskResult 中更新
-              resolve(result);
+              // 注意：handleTaskResult 已经调用了 updateRemoteTaskStatus 更新状态
+              // 如果失败，handleTaskResult 也已经记录了失败状态
+              // 这里只需要根据结果 resolve 或 reject，不需要再次触发重试
+              if (result.success) {
+                resolve(result);
+              } else {
+                const errorMsg = result.message || '远程执行失败';
+                console.warn(`[HarmonyInference] [Client] 远程任务执行失败: ${errorMsg}`);
+                // 重试由 handleTaskResult 中的失败状态更新触发
+                reject(new Error(errorMsg));
+              }
             }
           }, 100); // 每100ms检查一次结果
 
           setTimeout(() => {
             clearInterval(checkInterval);
-            // 超时更新任务状态为失败
-            this.scheduler.updateRemoteTaskStatus(
-              taskId,
-              false,
-              undefined,
-              '任务执行超时（30秒）'
-            );
-            reject(new Error('Task timeout after 30 seconds'));
-          }, 30000);
+            // 检查是否还在等待结果（可能 handleTaskResult 已经处理过了）
+            if (this.pendingTaskMap.has(taskId)) {
+              this.pendingTaskMap.delete(taskId);
+              // 超时，触发重试
+              console.warn(`[HarmonyInference] [Client] 远程任务结果接收超时: ${taskId}`);
+              this.scheduler.handleResultTimeout(taskId);
+              reject(new Error('Task timeout after 30 seconds'));
+            }
+          }, 10000);
         });
       }
     } catch (err) {
@@ -450,6 +499,144 @@ class HarmonyInferenceClient {
       console.error(`[HarmonyInference] [Client] 提交任务失败: ${errorMsg}`);
       throw new Error(errorMsg);
     }
+  }
+
+  // ####----------------------------------@重试机制方法@----------------------------------####
+
+  /**
+   * 设置重试回调
+   * 当 Scheduler 触发重试时，重新提交任务
+   */
+  private setupRetryCallback(): void {
+    this.scheduler.setRetryCallback((task: InferenceTask) => {
+      console.info(`[HarmonyInference] [Client] 收到重试回调，重新提交任务: ${task.taskId}`);
+      // 异步重新提交任务，不阻塞重试处理器
+      this.resubmitTask(task).catch((error: Error) => {
+        const errorMsg = error.message;
+        console.error(`[HarmonyInference] [Client] 重试任务提交失败: ${errorMsg}`);
+      });
+    });
+    console.info(`[HarmonyInference] [Client] 重试回调已设置`);
+  }
+
+  /**
+   * 重新提交任务（用于重试）
+   * @param task - 待重试的任务
+   */
+  private async resubmitTask(task: InferenceTask): Promise<void> {
+    const taskId = task.taskId;
+    console.info(`[HarmonyInference] [Client] 开始重新提交任务: ${taskId}`);
+
+    try {
+      const logMessages: string[] = [];
+      const shouldExecuteLocally = this.scheduler.workScheduler(task, logMessages);
+
+      if (shouldExecuteLocally) {
+        // 本地执行
+        console.info(`[HarmonyInference] [Client] 重试任务将在本地执行: ${taskId}`);
+        try {
+          const result = await GlobalTaskManager.getQueue().addTask(task);
+          
+          if (result.success) {
+            this.scheduler.updateLocalTaskStatus(taskId, true, result, undefined);
+            console.info(`[HarmonyInference] [Client] 重试任务本地执行成功: ${taskId}`);
+          } else {
+            const errorMsg = result.message || '本地执行失败';
+            this.scheduler.handleLocalExecutionFailure(taskId, errorMsg);
+            console.warn(`[HarmonyInference] [Client] 重试任务本地执行失败: ${errorMsg}`);
+          }
+        } catch (error) {
+          const errorMsg = error instanceof Error ? error.message : String(error);
+          this.scheduler.handleLocalExecutionFailure(taskId, errorMsg);
+          console.error(`[HarmonyInference] [Client] 重试任务本地执行异常: ${errorMsg}`);
+        } finally {
+          // 通知 Scheduler 重试任务完成
+          this.scheduler.notifyRetryComplete(taskId);
+        }
+      } else {
+        // 远程执行
+        console.info(`[HarmonyInference] [Client] 重试任务已分发到远程节点: ${taskId}`);
+        this.pendingTaskMap.set(taskId, task);
+        
+        // 注意：远程任务的结果处理在 handleTaskResult 中进行
+        // handleTaskResult 会调用 updateRemoteTaskStatus 更新状态
+        // 并在处理完成后调用 notifyRetryComplete
+        
+        // 设置超时处理，与 submitTask 保持一致
+        setTimeout(() => {
+          // 检查任务是否还在 pendingTaskMap 中（说明还没收到结果）
+          if (this.pendingTaskMap.has(taskId)) {
+            this.pendingTaskMap.delete(taskId);
+            console.warn(`[HarmonyInference] [Client] 重试的远程任务结果接收超时: ${taskId}`);
+            this.scheduler.handleResultTimeout(taskId);
+            // 通知重试完成（超时也算完成，会触发下一次重试）
+            this.scheduler.notifyRetryComplete(taskId);
+          }
+        }, 5000);
+      }
+    } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : String(error);
+      console.error(`[HarmonyInference] [Client] 重试任务调度失败: ${errorMsg}`);
+      this.scheduler.handleSchedulingFailure(taskId, errorMsg);
+      // 调度失败也需要通知完成
+      this.scheduler.notifyRetryComplete(taskId);
+    }
+  }
+
+  /**
+   * 清理重试相关资源
+   */
+  private cleanupRetryResources(): void {
+    // 清理 Scheduler 中的重试队列
+    this.scheduler.clearRetryQueue();
+    
+    // 清理待处理任务映射
+    this.pendingTaskMap.clear();
+    
+    console.info(`[HarmonyInference] [Client] 重试资源已清理`);
+  }
+
+  /**
+   * 设置重试配置
+   * @param config - 重试配置（部分配置）
+   */
+  public setRetryConfig(config: Partial<SchedulerRetryConfig>): void {
+    this.scheduler.setRetryConfig(config);
+  }
+
+  /**
+   * 获取当前重试配置
+   * @returns 当前重试配置
+   */
+  public getRetryConfig(): SchedulerRetryConfig {
+    return this.scheduler.getRetryConfig();
+  }
+
+  /**
+   * 获取任务重试次数
+   * @param taskId - 任务唯一标识
+   * @returns 当前重试次数
+   */
+  public getTaskRetryCount(taskId: string): number {
+    return this.scheduler.getTaskRetryCount(taskId);
+  }
+
+  /**
+   * 判断任务是否可以重试
+   * @param taskId - 任务唯一标识
+   * @returns 是否可以重试
+   */
+  public canRetryTask(taskId: string): boolean {
+    return this.scheduler.canRetry(taskId);
+  }
+
+  /**
+   * 手动触发任务重试
+   * @param taskId - 任务唯一标识
+   * @returns 是否成功触发重试
+   */
+  public retryTask(taskId: string): boolean {
+    return this.scheduler.retryTask(taskId);
   }
 
 }

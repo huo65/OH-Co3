@@ -7,7 +7,7 @@ export interface InferenceTask {
   type: InferenceInputType;
 
   // 规范化之后的核心数据结构
-  data: InferenceInputData;
+  data: InferenceInputData | undefined;
 
   params?: Record<string, string | number | boolean | ArrayBuffer>;
 }

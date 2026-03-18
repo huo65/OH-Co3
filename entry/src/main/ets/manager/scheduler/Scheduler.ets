@@ -3,7 +3,16 @@ import { ownName } from '../broker/monitor/NodeInfoSyn';
 import { taskDispatch, TaskTransmitData } from '../broker/task/TaskDispatch';
 import { DeviceInfo, systemProfiler } from '../monitor/SystemProfiler';
 import { paramSyn } from '../broker/paramOpt/ParamSyn';
-import { InferenceTask, InferenceResult } from '../worker/InferenceWorker';
+import { 
+  InferenceTask, 
+  InferenceResult, 
+  InferenceInputType, 
+  InferenceInputData,
+  ImageInputData,
+  TextInputData,
+  AudioInputData,
+  VideoInputData
+} from '../worker/InferenceWorker';
 import { systemDateTime } from '@kit.BasicServicesKit';
 
 /**
@@ -26,7 +35,58 @@ export enum TaskScheduleStatus {
   /** 任务执行失败 */
   FAILED = 'failed',
   /** 任务已取消 */
-  CANCELLED = 'cancelled'
+  CANCELLED = 'cancelled',
+  /** 任务等待重试 */
+  RETRYING = 'retrying'
+}
+
+/**
+ * 重试配置接口
+ * 定义任务重试的相关参数
+ */
+export interface SchedulerRetryConfig {
+  /** 最大重试次数，默认3次 */
+  maxRetries: number;
+  /** 基础延迟时间（毫秒），默认1000ms */
+  baseDelayMs: number;
+  /** 最大延迟时间（毫秒），默认10000ms */
+  maxDelayMs: number;
+  /** 是否启用指数退避，默认true */
+  exponentialBackoff: boolean;
+}
+
+/**
+ * 重试队列项
+ * 存储待重试的任务信息
+ */
+export interface SchedulerRetryQueueItem {
+  /** 待重试的任务 */
+  task: InferenceTask;
+  /** 当前重试次数 */
+  retryCount: number;
+  /** 计划执行时间戳 */
+  scheduledTime: number;
+  /** 失败原因 */
+  failureReason: string;
+}
+
+/**
+ * 失败类型枚举
+ * 用于区分不同类型的失败场景
+ */
+export enum SchedulerFailureType {
+  /** 调度决策失败 */
+  SCHEDULING_FAILED = 'scheduling_failed',
+  /** 本地执行失败 */
+  LOCAL_EXECUTION_FAILED = 'local_execution_failed',
+  /** 远程执行失败 */
+  REMOTE_EXECUTION_FAILED = 'remote_execution_failed',
+  /** 任务传输失败 */
+  TRANSMISSION_FAILED = 'transmission_failed',
+  /** 结果接收超时 */
+  RESULT_TIMEOUT = 'result_timeout',
+  /** 未知错误 */
+  UNKNOWN = 'unknown'
 }
 
 /**
@@ -65,6 +125,16 @@ export interface SchedulerTaskStatus {
   error?: string;
   /** 任务流转历史记录 */
   transitionHistory: TaskTransitionRecord[];
+  /** 当前重试次数 */
+  retryCount: number;
+  /** 最大重试次数 */
+  maxRetries: number;
+  /** 最后一次失败原因 */
+  lastFailureReason?: string;
+  /** 最后一次失败类型 */
+  lastFailureType?: SchedulerFailureType;
+  /** 原始任务数据（用于重试） */
+  originalTask?: InferenceTask;
 }
 
 /**
@@ -99,6 +169,40 @@ class Scheduler{
   private statusListeners: Array<(taskId: string, status: SchedulerTaskStatus) => void> = [];
 
   /**
+   * 重试配置
+   * 默认配置：最大重试3次，基础延迟1000ms，启用指数退避
+   */
+  private retryConfig: SchedulerRetryConfig = {
+    maxRetries: 3,
+    baseDelayMs: 1000,
+    maxDelayMs: 10000,
+    exponentialBackoff: true
+  };
+
+  /**
+   * 重试队列
+   * 存储待重试的任务
+   */
+  private retryQueue: SchedulerRetryQueueItem[] = [];
+
+  /**
+   * 重试处理器定时器ID
+   */
+  private retryTimerId: number | null = null;
+
+  /**
+   * 任务重试回调函数
+   * 当任务需要重试时调用，由 HarmonyInferenceClient 设置
+   */
+  private retryCallback: ((task: InferenceTask) => void) | null = null;
+
+  /**
+   * 活跃重试任务计数
+   * 记录当前正在执行的重试任务数量
+   */
+  private activeRetryCount: number = 0;
+
+  /**
    * 任务调度决策入口
    * 收集节点信息，计算各节点评分，选择最优节点执行任务
    * 
@@ -114,8 +218,8 @@ class Scheduler{
   workScheduler(task: InferenceTask, logMessages: Array<string>): Boolean {
     const taskId = task.taskId;
     
-    // 初始化任务状态记录
-    this.initTaskStatus(taskId);
+    // 初始化任务状态记录（传入原始任务数据用于重试）
+    this.initTaskStatus(taskId, task);
     
     // 更新状态为调度中
     this.updateTaskStatus(
@@ -215,27 +319,138 @@ class Scheduler{
   /**
    * 初始化任务状态记录
    * 在任务开始调度前调用，创建初始状态记录
+   * 如果是重试任务（taskId已存在），保留原有的重试计数
    * @param taskId - 任务唯一标识
+   * @param task - 原始任务数据（可选，用于重试）
    * @returns 创建的任务状态对象
    */
-  private initTaskStatus(taskId: string): SchedulerTaskStatus {
+  private initTaskStatus(taskId: string, task?: InferenceTask): SchedulerTaskStatus {
     const now = systemDateTime.getTime(false);
+    
+    // 检查是否已存在任务状态（重试场景）
+    const existingStatus = this.taskStatusMap.get(taskId);
+    
+    // 深拷贝任务数据，防止后续传输过程中被修改
+    const taskCopy: InferenceTask | undefined = task ? this.deepCopyTask(task) : undefined;
+    
     const status: SchedulerTaskStatus = {
       taskId: taskId,
       status: TaskScheduleStatus.PENDING,
-      createdAt: now,
+      createdAt: existingStatus ? existingStatus.createdAt : now,  // 保留原始创建时间
       updatedAt: now,
       targetNode: undefined,
-      transitionHistory: [{
+      transitionHistory: existingStatus ? existingStatus.transitionHistory : [{  // 保留历史记录
         timestamp: now,
         status: TaskScheduleStatus.PENDING,
         node: ownName,
         message: '任务已创建，等待调度'
-      }]
+      }],
+      retryCount: existingStatus ? existingStatus.retryCount : 0,  // 保留重试计数！
+      maxRetries: this.retryConfig.maxRetries,
+      lastFailureReason: existingStatus ? existingStatus.lastFailureReason : undefined,
+      lastFailureType: existingStatus ? existingStatus.lastFailureType : undefined,
+      originalTask: taskCopy || existingStatus?.originalTask  // 优先使用新传入的任务
     };
+    
+    // 添加状态流转记录
+    status.transitionHistory.push({
+      timestamp: now,
+      status: TaskScheduleStatus.PENDING,
+      node: ownName,
+      message: existingStatus ? '任务重新调度（重试）' : '任务已创建，等待调度'
+    });
+    
     this.taskStatusMap.set(taskId, status);
     this.notifyStatusChange(taskId, status);
     return status;
+  }
+
+  /**
+   * 深拷贝推理任务
+   * 防止任务数据在传输过程中被修改影响重试
+   * @param task - 原始任务
+   * @returns 深拷贝后的任务
+   */
+  private deepCopyTask(task: InferenceTask): InferenceTask {
+    // 基础字段拷贝
+    const copy: InferenceTask = {
+      taskId: task.taskId,
+      type: task.type,
+      data: undefined as InferenceInputData | undefined,
+      modelName: task.modelName,
+      params: task.params
+    };
+    
+    // 深拷贝 data 字段（可能包含 ArrayBuffer）
+    if (task.data) {
+      const inputType = task.type;
+      if (inputType === InferenceInputType.IMAGE) {
+        const imageData = task.data as ImageInputData;
+        if (imageData.buffer) {
+          // 创建新的 ArrayBuffer 副本
+          const originalBuffer = imageData.buffer;
+          const newBuffer = new ArrayBuffer(originalBuffer.byteLength);
+          const originalView = new Uint8Array(originalBuffer);
+          const newView = new Uint8Array(newBuffer);
+          newView.set(originalView);
+          
+          const newImageData: ImageInputData = {
+            type: InferenceInputType.IMAGE,
+            buffer: newBuffer,
+            format: imageData.format,
+            width: imageData.width,
+            height: imageData.height
+          };
+          copy.data = newImageData;
+        }
+      } else if (inputType === InferenceInputType.TEXT) {
+        const textData = task.data as TextInputData;
+        const newTextData: TextInputData = {
+          type: InferenceInputType.TEXT,
+          text: textData.text,
+          encoding: textData.encoding
+        };
+        copy.data = newTextData;
+      } else if (inputType === InferenceInputType.AUDIO) {
+        const audioData = task.data as AudioInputData;
+        if (audioData.buffer) {
+          const originalBuffer = audioData.buffer;
+          const newBuffer = new ArrayBuffer(originalBuffer.byteLength);
+          const originalView = new Uint8Array(originalBuffer);
+          const newView = new Uint8Array(newBuffer);
+          newView.set(originalView);
+          
+          const newAudioData: AudioInputData = {
+            type: InferenceInputType.AUDIO,
+            buffer: newBuffer,
+            sampleRate: audioData.sampleRate,
+            channels: audioData.channels
+          };
+          copy.data = newAudioData;
+        }
+      } else if (inputType === InferenceInputType.VIDEO) {
+        const videoData = task.data as VideoInputData;
+        if (videoData.buffer) {
+          const originalBuffer = videoData.buffer;
+          const newBuffer = new ArrayBuffer(originalBuffer.byteLength);
+          const originalView = new Uint8Array(originalBuffer);
+          const newView = new Uint8Array(newBuffer);
+          newView.set(originalView);
+          
+          const newVideoData: VideoInputData = {
+            type: InferenceInputType.VIDEO,
+            buffer: newBuffer,
+            fps: videoData.fps
+          };
+          copy.data = newVideoData;
+        }
+      } else {
+        // 其他类型直接赋值
+        copy.data = task.data;
+      }
+    }
+    
+    return copy;
   }
 
   /**
@@ -418,30 +633,32 @@ class Scheduler{
       const sendResult = await taskDispatch.sendTask(taskInfo);
       
       if (sendResult) {
-        // 分发成功，状态保持 DISPATCHED，等待远程执行结果
-        this.updateTaskStatus(
-          taskId,
-          TaskScheduleStatus.DISPATCHED,
-          to,
-          `任务已成功分发到节点: ${to}，等待远程执行结果`
-        );
+        // 分发成功，记录日志但不重复更新状态
+        // 状态已在 workScheduler 中设置为 DISPATCHED
+        console.info(`[HarmonyInference] [Scheduler] 任务已成功分发到节点: ${to}，任务ID: ${taskId}`);
       } else {
-        // 分发失败
+        // 分发失败，更新状态并触发重试
+        console.warn(`[HarmonyInference] [Scheduler] 任务分发到节点 ${to} 失败，任务ID: ${taskId}`);
         this.updateTaskStatus(
           taskId,
           TaskScheduleStatus.FAILED,
           to,
           `任务分发到节点 ${to} 失败`
         );
+        // 触发传输失败重试
+        this.handleTransmissionFailure(taskId, `任务分发到节点 ${to} 失败`);
       }
     } catch (error) {
-      console.error(`[HarmonyInference] [Scheduler] 分发任务失败: ${error}`);
+      const errorMsg = error instanceof Error ? error.message : String(error);
+      console.error(`[HarmonyInference] [Scheduler] 分发任务异常: ${errorMsg}，任务ID: ${taskId}`);
       this.updateTaskStatus(
         taskId,
         TaskScheduleStatus.FAILED,
         to,
-        `分发任务异常: ${error}`
+        `分发任务异常: ${errorMsg}`
       );
+      // 触发传输失败重试
+      this.handleTransmissionFailure(taskId, `分发任务异常: ${errorMsg}`);
     }
   }
 
@@ -526,5 +743,380 @@ class Scheduler{
       );
     }
   }
+
+  // ####----------------------------------@重试机制方法@----------------------------------####
+
+  /**
+   * 设置重试配置
+   * @param config - 重试配置对象
+   */
+  public setRetryConfig(config: Partial<SchedulerRetryConfig>): void {
+    if (config.maxRetries !== undefined) {
+      this.retryConfig.maxRetries = config.maxRetries;
+    }
+    if (config.baseDelayMs !== undefined) {
+      this.retryConfig.baseDelayMs = config.baseDelayMs;
+    }
+    if (config.maxDelayMs !== undefined) {
+      this.retryConfig.maxDelayMs = config.maxDelayMs;
+    }
+    if (config.exponentialBackoff !== undefined) {
+      this.retryConfig.exponentialBackoff = config.exponentialBackoff;
+    }
+    console.info(`[HarmonyInference] [Scheduler] 重试配置已更新: 最大重试次数=${this.retryConfig.maxRetries}, 基础延迟=${this.retryConfig.baseDelayMs}ms`);
+  }
+
+  /**
+   * 获取当前重试配置
+   * @returns 当前重试配置
+   */
+  public getRetryConfig(): SchedulerRetryConfig {
+    const config: SchedulerRetryConfig = {
+      maxRetries: this.retryConfig.maxRetries,
+      baseDelayMs: this.retryConfig.baseDelayMs,
+      maxDelayMs: this.retryConfig.maxDelayMs,
+      exponentialBackoff: this.retryConfig.exponentialBackoff
+    };
+    return config;
+  }
+
+  /**
+   * 设置重试回调函数
+   * @param callback - 重试回调函数
+   */
+  public setRetryCallback(callback: (task: InferenceTask) => void): void {
+    this.retryCallback = callback;
+    console.info(`[HarmonyInference] [Scheduler] 重试回调函数已设置`);
+  }
+
+  /**
+   * 判断任务是否可以重试
+   * @param taskId - 任务唯一标识
+   * @returns 是否可以重试
+   */
+  public canRetry(taskId: string): boolean {
+    const status = this.taskStatusMap.get(taskId);
+    if (!status) {
+      return false;
+    }
+    return status.retryCount < status.maxRetries;
+  }
+
+  /**
+   * 获取任务当前重试次数
+   * @param taskId - 任务唯一标识
+   * @returns 当前重试次数，任务不存在返回-1
+   */
+  public getTaskRetryCount(taskId: string): number {
+    const status = this.taskStatusMap.get(taskId);
+    return status ? status.retryCount : -1;
+  }
+
+  /**
+   * 计算重试延迟时间
+   * 使用指数退避策略
+   * @param retryCount - 当前重试次数
+   * @returns 延迟时间（毫秒）
+   */
+  private calculateRetryDelay(retryCount: number): number {
+    const baseDelayMs = this.retryConfig.baseDelayMs;
+    const maxDelayMs = this.retryConfig.maxDelayMs;
+    const exponentialBackoff = this.retryConfig.exponentialBackoff;
+    
+    if (exponentialBackoff) {
+      // 指数退避：delay = baseDelay * 1.5^retryCount
+      const delay = baseDelayMs * Math.pow(1.5, retryCount);
+      // 添加随机抖动（0.8-1.2倍）
+      const jitter = 0.8 + Math.random() * 0.4;
+      return Math.min(delay * jitter, maxDelayMs);
+    } else {
+      // 固定延迟 + 随机抖动
+      const jitter = 0.8 + Math.random() * 0.4;
+      return baseDelayMs * jitter;
+    }
+  }
+
+  /**
+   * 调度任务重试
+   * 将失败的任务加入重试队列，等待延迟后重新执行
+   * @param taskId - 任务唯一标识
+   * @param failureType - 失败类型
+   * @param failureReason - 失败原因
+   */
+  public scheduleRetry(taskId: string, failureType: SchedulerFailureType, failureReason: string): void {
+    const status = this.taskStatusMap.get(taskId);
+    if (!status) {
+      console.warn(`[HarmonyInference] [Scheduler] 调度重试失败，未找到任务: ${taskId}`);
+      return;
+    }
+
+    // 检查是否可以重试
+    if (!this.canRetry(taskId)) {
+      console.warn(`[HarmonyInference] [Scheduler] 任务已达到最大重试次数: ${taskId}, 重试次数: ${status.retryCount}/${status.maxRetries}`);
+      // 最终标记为失败
+      this.markTaskFinallyFailed(taskId, failureReason);
+      return;
+    }
+
+    // 获取原始任务数据
+    const originalTask = status.originalTask;
+    if (!originalTask) {
+      console.error(`[HarmonyInference] [Scheduler] 无法重试，缺少原始任务数据: ${taskId}`);
+      this.markTaskFinallyFailed(taskId, '缺少原始任务数据，无法重试');
+      return;
+    }
+
+    // 计算重试延迟
+    const delay = this.calculateRetryDelay(status.retryCount);
+    const scheduledTime = systemDateTime.getTime(false) + delay;
+
+    // 更新任务状态为重试中
+    status.retryCount++;
+    status.lastFailureReason = failureReason;
+    status.lastFailureType = failureType;
+    status.status = TaskScheduleStatus.RETRYING;
+    status.updatedAt = systemDateTime.getTime(false);
+    
+    // 记录流转历史
+    status.transitionHistory.push({
+      timestamp: status.updatedAt,
+      status: TaskScheduleStatus.RETRYING,
+      node: ownName,
+      message: `任务失败，准备第${status.retryCount}次重试，原因: ${failureReason}`
+    });
+
+    this.notifyStatusChange(taskId, status);
+    console.info(`[HarmonyInference] [Scheduler] 任务已加入重试队列: ${taskId}, 第${status.retryCount}次重试, 延迟${delay.toFixed(0)}ms`);
+
+    // 加入重试队列
+    this.retryQueue.push({
+      task: originalTask,
+      retryCount: status.retryCount,
+      scheduledTime: scheduledTime,
+      failureReason: failureReason
+    });
+
+    console.info(`[HarmonyInference] [Scheduler] 任务已加入重试队列: ${taskId}, 第${status.retryCount}次重试, 延迟${delay.toFixed(0)}ms, 队列长度: ${this.retryQueue.length}, 活跃重试: ${this.activeRetryCount}`);
+
+    // 启动重试处理器（如果未运行）
+    this.startRetryProcessor();
+  }
+
+  /**
+   * 启动重试处理器
+   * 使用简单的轮询机制，每200ms检查一次队列
+   * 关键点：处理器只有在队列为空且没有活跃重试任务时才停止
+   */
+  private startRetryProcessor(): void {
+    // 如果定时器已存在，说明处理器正在运行，直接返回
+    if (this.retryTimerId !== null) {
+      return;
+    }
+
+    console.info(`[HarmonyInference] [Scheduler] 重试处理器已启动`);
+
+    const processRetryQueue = () => {
+      const now = systemDateTime.getTime(false);
+      
+      // 找出到期的重试任务
+      const readyItems = this.retryQueue.filter(item => item.scheduledTime <= now);
+      
+      if (readyItems.length > 0) {
+        // 从队列中移除已处理的项（保留未到期的）
+        this.retryQueue = this.retryQueue.filter(item => item.scheduledTime > now);
+        
+        // 执行重试
+        readyItems.forEach(item => {
+          const taskId = item.task.taskId;
+          
+          // 增加活跃重试计数
+          this.activeRetryCount++;
+          
+          console.info(`[HarmonyInference] [Scheduler] 开始执行第${item.retryCount}次重试: ${taskId}, 活跃重试: ${this.activeRetryCount}`);
+          
+          // 更新任务状态为 PENDING
+          const taskStatus = this.taskStatusMap.get(taskId);
+          if (taskStatus) {
+            taskStatus.status = TaskScheduleStatus.PENDING;
+            taskStatus.updatedAt = now;
+            taskStatus.transitionHistory.push({
+              timestamp: now,
+              status: TaskScheduleStatus.PENDING,
+              node: ownName,
+              message: `开始第${item.retryCount}次重试`
+            });
+            this.notifyStatusChange(taskId, taskStatus);
+          }
+
+          // 调用重试回调（异步执行，不阻塞轮询）
+          if (this.retryCallback) {
+            // 使用 setTimeout 确保异步执行，给处理器时间继续轮询
+            setTimeout(() => {
+              try {
+                this.retryCallback!(item.task);
+              } catch (error) {
+                console.error(`[HarmonyInference] [Scheduler] 重试回调执行失败: ${error}`);
+              }
+            }, 0);
+          }
+        });
+      }
+
+      // 检查是否需要继续轮询
+      // 条件：队列不为空 或 有活跃的重试任务
+      if (this.retryQueue.length > 0 || this.activeRetryCount > 0) {
+        // 继续轮询
+        this.retryTimerId = setTimeout(processRetryQueue, 200);
+      } else {
+        // 队列为空且没有活跃任务，停止处理器
+        this.retryTimerId = null;
+        console.info(`[HarmonyInference] [Scheduler] 重试处理器已停止`);
+      }
+    };
+
+    // 立即开始第一次检查
+    processRetryQueue();
+  }
+
+  /**
+   * 通知重试任务完成
+   * 当重试任务执行完成（成功或失败）时调用，用于减少活跃计数
+   * @param taskId - 任务唯一标识
+   */
+  public notifyRetryComplete(taskId: string): void {
+    if (this.activeRetryCount > 0) {
+      this.activeRetryCount--;
+      console.info(`[HarmonyInference] [Scheduler] 重试任务完成: ${taskId}, 剩余活跃重试: ${this.activeRetryCount}`);
+    }
+  }
+
+  /**
+   * 停止重试处理器
+   */
+  private stopRetryProcessor(): void {
+    if (this.retryTimerId !== null) {
+      clearTimeout(this.retryTimerId);
+      this.retryTimerId = null;
+    }
+    this.activeRetryCount = 0;
+    console.info(`[HarmonyInference] [Scheduler] 重试处理器已停止`);
+  }
+
+  /**
+   * 标记任务最终失败
+   * 当达到最大重试次数后调用
+   * @param taskId - 任务唯一标识
+   * @param reason - 最终失败原因
+   */
+  private markTaskFinallyFailed(taskId: string, reason: string): void {
+    const status = this.taskStatusMap.get(taskId);
+    if (!status) {
+      return;
+    }
+
+    const now = systemDateTime.getTime(false);
+    status.status = TaskScheduleStatus.FAILED;
+    status.updatedAt = now;
+    status.error = `最终失败（已重试${status.retryCount}次）: ${reason}`;
+    
+    status.transitionHistory.push({
+      timestamp: now,
+      status: TaskScheduleStatus.FAILED,
+      node: ownName,
+      message: `任务最终失败，已重试${status.retryCount}次，原因: ${reason}`
+    });
+
+    this.notifyStatusChange(taskId, status);
+    console.warn(`[HarmonyInference] [Scheduler] 任务最终失败: ${taskId}, 重试次数: ${status.retryCount}, 原因: ${reason}`);
+  }
+
+  /**
+   * 手动触发任务重试
+   * 提供外部API供手动重试失败的任务
+   * @param taskId - 任务唯一标识
+   * @returns 是否成功触发重试
+   */
+  public retryTask(taskId: string): boolean {
+    const status = this.taskStatusMap.get(taskId);
+    if (!status) {
+      console.warn(`[HarmonyInference] [Scheduler] 手动重试失败，未找到任务: ${taskId}`);
+      return false;
+    }
+
+    if (status.status !== TaskScheduleStatus.FAILED) {
+      console.warn(`[HarmonyInference] [Scheduler] 只有失败状态的任务才能手动重试: ${taskId}, 当前状态: ${status.status}`);
+      return false;
+    }
+
+    // 重置重试计数（手动重试允许额外重试机会）
+    status.retryCount = 0;
+    
+    this.scheduleRetry(taskId, status.lastFailureType || SchedulerFailureType.UNKNOWN, status.lastFailureReason || '手动触发重试');
+    return true;
+  }
+
+  /**
+   * 清理重试队列
+   * 销毁时调用，清理所有待重试的任务
+   */
+  public clearRetryQueue(): void {
+    this.stopRetryProcessor();
+    this.retryQueue = [];
+    console.info(`[HarmonyInference] [Scheduler] 重试队列已清理`);
+  }
+
+  /**
+   * 获取当前重试队列长度
+   * @returns 重试队列中的任务数量
+   */
+  public getRetryQueueLength(): number {
+    return this.retryQueue.length;
+  }
+
+  /**
+   * 处理调度失败
+   * 当调度决策过程中发生错误时调用
+   * @param taskId - 任务唯一标识
+   * @param error - 错误信息
+   */
+  public handleSchedulingFailure(taskId: string, error: string): void {
+    this.scheduleRetry(taskId, SchedulerFailureType.SCHEDULING_FAILED, error);
+  }
+
+  /**
+   * 处理本地执行失败
+   * @param taskId - 任务唯一标识
+   * @param error - 错误信息
+   */
+  public handleLocalExecutionFailure(taskId: string, error: string): void {
+    this.scheduleRetry(taskId, SchedulerFailureType.LOCAL_EXECUTION_FAILED, error);
+  }
+
+  /**
+   * 处理远程执行失败
+   * @param taskId - 任务唯一标识
+   * @param error - 错误信息
+   */
+  public handleRemoteExecutionFailure(taskId: string, error: string): void {
+    this.scheduleRetry(taskId, SchedulerFailureType.REMOTE_EXECUTION_FAILED, error);
+  }
+
+  /**
+   * 处理传输失败
+   * @param taskId - 任务唯一标识
+   * @param error - 错误信息
+   */
+  public handleTransmissionFailure(taskId: string, error: string): void {
+    this.scheduleRetry(taskId, SchedulerFailureType.TRANSMISSION_FAILED, error);
+  }
+
+  /**
+   * 处理结果接收超时
+   * @param taskId - 任务唯一标识
+   */
+  public handleResultTimeout(taskId: string): void {
+    this.scheduleRetry(taskId, SchedulerFailureType.RESULT_TIMEOUT, '任务结果接收超时');
+  }
 }
+
 export { Scheduler };
