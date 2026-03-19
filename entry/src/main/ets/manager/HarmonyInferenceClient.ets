@@ -10,7 +10,6 @@ import emitter from '@ohos.events.emitter';
 import { nodeInfoSyn } from './broker/monitor/NodeInfoSyn';
 import { paramSyn } from './broker/paramOpt/ParamSyn';
 import { taskDispatch,TaskResTransmitData} from './broker/task/TaskDispatch';
-import { MQTTOption } from './broker/MQTTConfig';
 
 // 事件ID定义
 // const RESULT_EVENT_ID = 1002;
@@ -166,7 +165,6 @@ class HarmonyInferenceClient {
     }
 
     try {
-      MQTTOption.clientId = config.clientId;
       await this.initMQTTClient(config)
       this.initEventListeners()
 

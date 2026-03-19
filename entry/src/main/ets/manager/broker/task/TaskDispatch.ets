@@ -2,13 +2,13 @@ import { InferenceTask } from '../../HarmonyInferenceClient';
 import { GlobalTaskManager } from '../../worker/GlobalTaskManager';
 import { InferenceResult, InferenceInputType, ImageInputData } from '../../worker/InferenceWorker';
 import { FileTransferManager, TransferNotifyCallback } from '../../transfer/FileTransferManager';
-import { ownName } from '../monitor/NodeInfoSyn';
 import { MQTTClient } from '../MQTTClient'
 import { systemDateTime } from '@kit.BasicServicesKit';
 import { FileUtils } from '../../transfer/utils/FileUtils';
 import { FileInfo } from '../../transfer/model/TransferDataModels';
 import { TCPNotifyInfo } from '../../transfer/model/TCPModels';
 import { InferenceDataUtils } from '../../worker/InferenceDataUtils';
+import { getDeviceId } from '../../config/DeviceIdentifier';
 
 
 /**
@@ -221,7 +221,8 @@ class TaskDispatch{
     const taskInfo: TaskTransmitData = JSON.parse(message);
     console.info(`[HarmonyInference] [TaskDispatch] 收到任务消息，任务ID: ${taskInfo.taskId}`);
 
-    if (taskInfo.toClient !== ownName) {
+    const ownDeviceId: string = getDeviceId();
+    if (taskInfo.toClient !== ownDeviceId) {
       return;
     }
 
@@ -310,9 +311,10 @@ class TaskDispatch{
   parseResultMessage(message: string): TaskResTransmitData | null {
     const taskResult: TaskResTransmitData = JSON.parse(message);
     const fromClient = taskResult.fromClient;
+    const ownDeviceId: string = getDeviceId();
     console.info(`[HarmonyInference] [TaskDispatch] 解析任务结果消息，来源设备: ${fromClient}`);
-    console.info(`[HarmonyInference] [TaskDispatch] 当前设备名称: ${ownName}`);
-    if (fromClient == ownName) {
+    console.info(`[HarmonyInference] [TaskDispatch] 当前设备标识: ${ownDeviceId}`);
+    if (fromClient == ownDeviceId) {
       console.info(`[HarmonyInference] [TaskDispatch] 匹配成功，返回本设备发出的任务结果`);
       return taskResult;
     }

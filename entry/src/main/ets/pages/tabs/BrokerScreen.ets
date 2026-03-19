@@ -1,7 +1,7 @@
 
-import { MQTTClient, EVENTID} from '../../manager/broker/MQTTClient'
+import { MQTTClient, EVENTID, MQTTOptionsType} from '../../manager/broker/MQTTClient'
 import emitter from '@ohos.events.emitter';
-import { MQTTOption } from '../../manager/broker/MQTTConfig';
+import { getDeviceId } from '../../manager/config/DeviceIdentifier';
 import { nodeInfoSyn } from '../../manager/broker/monitor/NodeInfoSyn';
 import { paramSyn } from '../../manager/broker/paramOpt/ParamSyn';
 import { taskDispatch } from '../../manager/broker/task/TaskDispatch';
@@ -16,7 +16,10 @@ export  interface RealDataPass {
 
 //ohpm uninstall @ohos/mqtt
 //ohpm install @ohos/mqtt@2.0.12
-const MQTTInstance: MQTTClient = MQTTClient.getNewInstance(MQTTOption)
+const defaultMQTTOptions: MQTTOptionsType = {
+  clientId: getDeviceId()
+}
+const MQTTInstance: MQTTClient = MQTTClient.getNewInstance(defaultMQTTOptions)
 // 定义一个简单的MQTT客户端组件
 @Component
 @Preview

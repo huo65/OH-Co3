@@ -14,7 +14,7 @@ const EVENTID = 1001
 const RESULT_EVENT_ID = 1002
 interface MQTTOptionsType {
   url?: string
-  clientId?: string
+  clientId: string
   userName?: string
   password?: string
   topic?: string

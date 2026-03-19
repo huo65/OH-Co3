@@ -4,9 +4,9 @@
  */
 import { DeviceInfo } from '../../monitor/SystemProfiler'
 import { MQTTClient } from '../MQTTClient'
-import { MQTTOption } from '../MQTTConfig'
 import HashMap from '@ohos.util.HashMap'
 import { systemDateTime } from '@kit.BasicServicesKit';
+import { getDeviceId } from '../../config/DeviceIdentifier';
 
 /**
  * 节点信息对象接口
@@ -28,14 +28,9 @@ interface LatencyInfoObj {
 }
 
 /**
- * 本设备名称
- * 从MQTT配置中获取客户端ID作为设备名称
- */
-const ownName: string = MQTTOption.clientId as string
-
-/**
  * 节点信息同步类
  * 管理设备网络中的节点信息，处理节点信息的发送与接收
+ * 使用统一的设备标识管理模块获取本设备标识
  */
 class NodeInfoSyn{
 
@@ -101,8 +96,9 @@ class NodeInfoSyn{
     try {
       const nodeInfoObj: NodeInfoObj = JSON.parse(message);
       const newDeviceName: string = nodeInfoObj.deviceName;
+      const ownDeviceId: string = getDeviceId();
 
-      if (ownName != newDeviceName) {
+      if (ownDeviceId != newDeviceName) {
         const params: DeviceInfo = nodeInfoObj.params;
         const newNodeInfo: DeviceInfo = {
           deviceName: newDeviceName,
@@ -131,9 +127,10 @@ class NodeInfoSyn{
   testLatencySend() {
     const MQTTInstance: MQTTClient = MQTTClient.getInstance()
     const timepStamp = systemDateTime.getTime(false);
+    const ownDeviceId: string = getDeviceId();
     const message: string = `
     {
-        "deviceName": "${ownName}",
+        "deviceName": "${ownDeviceId}",
         "timeStamp": "${timepStamp}"
     }
     `.trim();
@@ -151,8 +148,9 @@ class NodeInfoSyn{
     try {
       const latencyInfoObj: LatencyInfoObj = JSON.parse(message);
       const objDeviceName: string = latencyInfoObj.deviceName;
+      const ownDeviceId: string = getDeviceId();
 
-      if (ownName == objDeviceName) {
+      if (ownDeviceId == objDeviceName) {
         const timeStamp: number = latencyInfoObj.timeStamp;
         const newTimepStamp = systemDateTime.getTime(false);
         let latency = newTimepStamp - timeStamp;
@@ -168,4 +166,3 @@ class NodeInfoSyn{
   }
 }
 export const nodeInfoSyn = new NodeInfoSyn();
-export {ownName}

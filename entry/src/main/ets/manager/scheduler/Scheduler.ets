@@ -1,5 +1,5 @@
 import HashMap from '@ohos.util.HashMap';
-import { ownName } from '../broker/monitor/NodeInfoSyn';
+import { getDeviceId } from '../config/DeviceIdentifier';
 import { taskDispatch, TaskTransmitData } from '../broker/task/TaskDispatch';
 import { DeviceInfo, systemProfiler } from '../monitor/SystemProfiler';
 import { paramSyn } from '../broker/paramOpt/ParamSyn';
@@ -221,11 +221,13 @@ class Scheduler{
     // 初始化任务状态记录（传入原始任务数据用于重试）
     this.initTaskStatus(taskId, task);
     
+    const ownDeviceId: string = getDeviceId();
+    
     // 更新状态为调度中
     this.updateTaskStatus(
       taskId,
       TaskScheduleStatus.SCHEDULING,
-      ownName,
+      ownDeviceId,
       '开始节点评分与调度决策'
     );
 
@@ -246,7 +248,7 @@ class Scheduler{
       this.updateTaskStatus(
         taskId,
         TaskScheduleStatus.FAILED,
-        ownName,
+        ownDeviceId,
         `获取设备信息失败: ${error}`
       );
       return true; // 出错时默认本地执行
@@ -257,7 +259,7 @@ class Scheduler{
       const score = this.calculate_score(highestScoreNode[1]);
       console.info(`[HarmonyInference] [Scheduler] 最优节点: ${targetNode}, 评分: ${score.toFixed(2)}`);
       
-      if (targetNode !== ownName) {
+      if (targetNode !== ownDeviceId) {
         // 分发到远程节点
         this.updateTaskStatus(
           taskId,
@@ -274,7 +276,7 @@ class Scheduler{
         this.updateTaskStatus(
           taskId,
           TaskScheduleStatus.RUNNING_LOCAL,
-          ownName,
+          ownDeviceId,
           `当前节点为最优节点，评分: ${score.toFixed(2)}，将在本地执行`
         );
       }
@@ -283,7 +285,7 @@ class Scheduler{
       this.updateTaskStatus(
         taskId,
         TaskScheduleStatus.RUNNING_LOCAL,
-        ownName,
+        ownDeviceId,
         '未找到其他可用节点，默认本地执行'
       );
     }
@@ -326,6 +328,7 @@ class Scheduler{
    */
   private initTaskStatus(taskId: string, task?: InferenceTask): SchedulerTaskStatus {
     const now = systemDateTime.getTime(false);
+    const ownDeviceId: string = getDeviceId();
     
     // 检查是否已存在任务状态（重试场景）
     const existingStatus = this.taskStatusMap.get(taskId);
@@ -342,7 +345,7 @@ class Scheduler{
       transitionHistory: existingStatus ? existingStatus.transitionHistory : [{  // 保留历史记录
         timestamp: now,
         status: TaskScheduleStatus.PENDING,
-        node: ownName,
+        node: ownDeviceId,
         message: '任务已创建，等待调度'
       }],
       retryCount: existingStatus ? existingStatus.retryCount : 0,  // 保留重试计数！
@@ -356,7 +359,7 @@ class Scheduler{
     // status.transitionHistory.push({
     //   timestamp: now,
     //   status: TaskScheduleStatus.PENDING,
-    //   node: ownName,
+    //   node: ownDeviceId,
     //   message: existingStatus ? '任务重新调度（重试）' : '任务已创建，等待调度'
     // });
     
@@ -478,6 +481,7 @@ class Scheduler{
     }
 
     const now = systemDateTime.getTime(false);
+    const ownDeviceId: string = getDeviceId();
     status.status = newStatus;
     status.updatedAt = now;
     
@@ -495,7 +499,7 @@ class Scheduler{
     status.transitionHistory.push({
       timestamp: now,
       status: newStatus,
-      node: targetNode || ownName,
+      node: targetNode || ownDeviceId,
       message: message || `状态变更为: ${newStatus}`
     });
 
@@ -621,11 +625,12 @@ class Scheduler{
   async dispatchTask(inferenceTask: InferenceTask, to: string) {
     let taskInfo: TaskTransmitData = new TaskTransmitData();
     const taskId = inferenceTask.taskId;
+    const ownDeviceId: string = getDeviceId();
 
     try {
       const time = systemDateTime.getTime(false);
       taskInfo.taskId = taskId;
-      taskInfo.fromClient = ownName;
+      taskInfo.fromClient = ownDeviceId;
       taskInfo.toClient = to;
       taskInfo.timestamp = time;
       taskInfo.params = inferenceTask;
@@ -723,11 +728,12 @@ class Scheduler{
       return;
     }
 
+    const ownDeviceId: string = getDeviceId();
     if (success) {
       this.updateTaskStatus(
         taskId,
         TaskScheduleStatus.COMPLETED,
-        ownName,
+        ownDeviceId,
         '本地任务执行完成',
         result,
         undefined
@@ -736,7 +742,7 @@ class Scheduler{
       this.updateTaskStatus(
         taskId,
         TaskScheduleStatus.FAILED,
-        ownName,
+        ownDeviceId,
         `本地任务执行失败: ${error || '未知错误'}`,
         undefined,
         error
@@ -877,11 +883,12 @@ class Scheduler{
     status.status = TaskScheduleStatus.RETRYING;
     status.updatedAt = systemDateTime.getTime(false);
     
+    const ownDeviceId: string = getDeviceId();
     // 记录流转历史
     status.transitionHistory.push({
       timestamp: status.updatedAt,
       status: TaskScheduleStatus.RETRYING,
-      node: ownName,
+      node: ownDeviceId,
       message: `任务失败，准备第${status.retryCount}次重试，原因: ${failureReason}`
     });
 
@@ -934,6 +941,7 @@ class Scheduler{
           
           console.info(`[HarmonyInference] [Scheduler] 开始执行第${item.retryCount}次重试: ${taskId}, 活跃重试: ${this.activeRetryCount}`);
           
+          const ownDeviceId: string = getDeviceId();
           // 更新任务状态为 PENDING
           const taskStatus = this.taskStatusMap.get(taskId);
           if (taskStatus) {
@@ -942,7 +950,7 @@ class Scheduler{
             taskStatus.transitionHistory.push({
               timestamp: now,
               status: TaskScheduleStatus.PENDING,
-              node: ownName,
+              node: ownDeviceId,
               message: `开始第${item.retryCount}次重试`
             });
             this.notifyStatusChange(taskId, taskStatus);
@@ -1015,6 +1023,7 @@ class Scheduler{
     }
 
     const now = systemDateTime.getTime(false);
+    const ownDeviceId: string = getDeviceId();
     status.status = TaskScheduleStatus.FAILED;
     status.updatedAt = now;
     status.error = `最终失败（已重试${status.retryCount}次）: ${reason}`;
@@ -1022,7 +1031,7 @@ class Scheduler{
     status.transitionHistory.push({
       timestamp: now,
       status: TaskScheduleStatus.FAILED,
-      node: ownName,
+      node: ownDeviceId,
       message: `任务最终失败，已重试${status.retryCount}次，原因: ${reason}`
     });
 

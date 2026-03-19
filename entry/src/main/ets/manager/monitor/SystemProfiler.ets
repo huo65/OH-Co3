@@ -3,7 +3,7 @@ import statfs from '@ohos.file.statvfs';
 import HashMap from '@ohos.util.HashMap';
 import GetSystemInfo from 'libentry.so';
 import { nodeInfoSyn } from '../broker/monitor/NodeInfoSyn';
-import { MQTTOption } from '../broker/MQTTConfig';
+import { getDeviceId } from '../config/DeviceIdentifier';
 import { hidebug } from '@kit.PerformanceAnalysisKit';
 import { taskpool } from '@kit.ArkTS';
 // API12之后系统接口新增了一系列获取系统信息的接口，这里为兼容旧版本内存信息获取依旧使用NDK https://docs.openharmony.cn/pages/v6.0/zh-cn/application-dev/reference/apis-performance-analysis-kit/js-apis-hidebug.md#systemmeminfo12
@@ -79,9 +79,10 @@ class SystemProfiler{
     this.deviceInfos.set(this.ownInfo.deviceName,this.ownInfo)
     return this.deviceInfos
   }
-  // 获取设备产品名称，
+  // 获取设备唯一标识符
+  // 使用统一的设备标识管理模块，确保全局一致性
   getDeviceName() {
-    this.ownInfo.deviceName = MQTTOption.clientId as string
+    this.ownInfo.deviceName = getDeviceId()
   }
   async getCpuInfo() {
     try {

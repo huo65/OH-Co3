@@ -6,7 +6,7 @@ import { ModelManager } from '../TestImageTask/ImageIdModelManager';
 import { SchedulerTaskStatus, TaskScheduleStatus, TaskTransitionRecord } from '../manager/scheduler/Scheduler';
 import deviceInfo from '@ohos.deviceInfo';
 import image from '@ohos.multimedia.image';
-import { MQTTOption } from '../manager/broker/MQTTConfig';
+import { getDeviceId } from '../manager/config/DeviceIdentifier';
 
 // 日志级别枚举
 enum LogLevel {
@@ -298,7 +298,7 @@ export struct TestClientPage {
   private buildMQTTConfig(): MQTTConfig {
     return {
       url: `mqtt://${this.mqttServerIp}:${this.mqttServerPort}`,
-      clientId: MQTTOption.clientId,
+      clientId: getDeviceId(),
       userName: this.mqttUsername,
       password: this.mqttPassword,
       topic: '/test/123',
@@ -415,7 +415,7 @@ export struct TestClientPage {
       if (this.mqttConnected) {
         Column({ space: 4 }) {
           this.buildInfoRow('服务器', `mqtt://${this.mqttServerIp}:${this.mqttServerPort}`)
-          this.buildInfoRow('客户端ID', MQTTOption.clientId)
+          this.buildInfoRow('客户端ID', getDeviceId())
         }
         .width('100%')
         .padding({ top: 8 })
