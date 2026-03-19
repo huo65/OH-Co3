@@ -352,13 +352,13 @@ class Scheduler{
       originalTask: taskCopy || existingStatus?.originalTask  // 优先使用新传入的任务
     };
     
-    // 添加状态流转记录
-    status.transitionHistory.push({
-      timestamp: now,
-      status: TaskScheduleStatus.PENDING,
-      node: ownName,
-      message: existingStatus ? '任务重新调度（重试）' : '任务已创建，等待调度'
-    });
+    // // 添加状态流转记录
+    // status.transitionHistory.push({
+    //   timestamp: now,
+    //   status: TaskScheduleStatus.PENDING,
+    //   node: ownName,
+    //   message: existingStatus ? '任务重新调度（重试）' : '任务已创建，等待调度'
+    // });
     
     this.taskStatusMap.set(taskId, status);
     this.notifyStatusChange(taskId, status);
