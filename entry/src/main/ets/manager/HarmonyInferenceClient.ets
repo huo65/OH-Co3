@@ -1,6 +1,6 @@
 import { EVENTID, MQTTClient, MQTTOptionsType, RESULT_EVENT_ID } from './broker/MQTTClient';
 import { MqttQos } from '@ohos/mqtt';
-import { Scheduler, SchedulerTaskStatus, TaskScheduleStatus, TaskTransitionRecord, SchedulerRetryConfig, SchedulerFailureType } from './scheduler/Scheduler';
+import { Scheduler, SchedulerTaskStatus, TaskScheduleStatus, TaskTransitionRecord, SchedulerRetryConfig, SchedulerFailureType, TaskSourceType } from './scheduler/Scheduler';
 import { ModelManager } from '../TestImageTask/ImageIdModelManager';
 import { InferenceWorker, InferenceTask, InferenceResult } from './worker/InferenceWorker';
 import { GlobalTaskManager } from './worker/GlobalTaskManager';

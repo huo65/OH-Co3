@@ -9,6 +9,7 @@ import { FileInfo } from '../../transfer/model/TransferDataModels';
 import { TCPNotifyInfo } from '../../transfer/model/TCPModels';
 import { InferenceDataUtils } from '../../worker/InferenceDataUtils';
 import { getDeviceId } from '../../config/DeviceIdentifier';
+import { Scheduler, TaskScheduleStatus } from '../../scheduler/Scheduler';
 
 
 /**
@@ -215,17 +216,31 @@ class TaskDispatch{
    * 解析接收到的任务消息并处理
    * - 直接传输（direct）：直接执行本地推理
    * - 大文件传输（tcp 或其他协议）：委托 FileTransferManager 建立连接并接收文件，再执行推理
+   * 
+   * 新增功能：集成任务状态跟踪
+   * - 任务接收时初始化状态为 RECEIVED
+   * - 文件接收/执行过程中更新状态
+   * - 执行完成/失败时更新最终状态
+   * 
    * @param message - 接收到的任务消息 JSON 字符串
    */
-  // TODO 收到远程任务的处理日志
   async parseTaskMessage(message: string) {
     const taskInfo: TaskTransmitData = JSON.parse(message);
-    console.info(`[HarmonyInference] [TaskDispatch] 收到任务消息，任务ID: ${taskInfo.taskId}`);
+    const taskId = taskInfo.taskId;
+    const sourceDevice = taskInfo.fromClient;
+    console.info(`[HarmonyInference] [TaskDispatch] 收到任务消息，任务ID: ${taskId}, 来源: ${sourceDevice}`);
 
     const ownDeviceId: string = getDeviceId();
     if (taskInfo.toClient !== ownDeviceId) {
+      console.info(`[HarmonyInference] [TaskDispatch] 任务目标设备非本设备，忽略`);
       return;
     }
+
+    // 获取 Scheduler 实例
+    const scheduler = Scheduler.getInstance();
+    
+    // 初始化接收任务状态
+    scheduler.initReceivedTaskStatus(taskId, sourceDevice, taskInfo.params);
 
     // 判断是否需要文件传输（transferType 不为 'direct' 且有源设备地址）
     if (taskInfo.transferType !== 'direct') {
@@ -233,15 +248,23 @@ class TaskDispatch{
       // transferType 的值即为协议名称（如 'TCP', 'UDP' 等）
       const protocolName = taskInfo.transferType;
       console.info(`[HarmonyInference] [TaskDispatch] 收到${protocolName}大文件传输任务，委托FileTransferManager接收文件`);
+      
+      // 更新状态：正在接收文件
+      scheduler.updateReceivedTaskStatus(
+        taskId,
+        TaskScheduleStatus.RECEIVED,
+        `正在通过${protocolName}接收文件`
+      );
+      
       try {
         const fileInfo: FileInfo = {
-          fileId: taskInfo.taskId,
-          fileName: taskInfo.taskId,
+          fileId: taskId,
+          fileName: taskId,
           size: 0,
           hash: taskInfo.fileHash
         };
         const fileResult = await FileTransferManager.getInstance().receiveFile(
-          taskInfo.taskId,
+          taskId,
           taskInfo.sourceDevice as string,
           fileInfo,
           protocolName
@@ -256,15 +279,40 @@ class TaskDispatch{
             };
             taskInfo.params.data = imageDataObj;
           }
+          // 文件接收成功，执行推理
+          await this.executeAndReturn(taskInfo);
         } else {
-          console.error(`[HarmonyInference] [TaskDispatch] 文件接收失败: ${fileResult.error?.message}`);
-          return;
+          // 文件接收失败
+          const errorMsg = fileResult.error?.message || '文件接收失败';
+          console.error(`[HarmonyInference] [TaskDispatch] 文件接收失败: ${errorMsg}`);
+          
+          // 更新状态为失败
+          scheduler.updateReceivedTaskStatus(
+            taskId,
+            TaskScheduleStatus.FAILED,
+            `文件接收失败: ${errorMsg}`,
+            undefined,
+            errorMsg
+          );
+          
+          // 发送失败结果给请求方
+          this.sendFailureResult(taskInfo, `文件接收失败: ${errorMsg}`);
         }
-
-        // 执行推理并返回结果
-        await this.executeAndReturn(taskInfo);
       } catch (error) {
-        console.error(`[HarmonyInference] [TaskDispatch] ${protocolName}文件接收失败: ${error}`);
+        const errorMsg = error instanceof Error ? error.message : String(error);
+        console.error(`[HarmonyInference] [TaskDispatch] ${protocolName}文件接收异常: ${errorMsg}`);
+        
+        // 更新状态为失败
+        scheduler.updateReceivedTaskStatus(
+          taskId,
+          TaskScheduleStatus.FAILED,
+          `${protocolName}文件接收异常: ${errorMsg}`,
+          undefined,
+          errorMsg
+        );
+        
+        // 发送失败结果给请求方
+        this.sendFailureResult(taskInfo, `${protocolName}文件接收异常: ${errorMsg}`);
       }
     } else {
       // 直接传输：执行本地推理并返回结果
@@ -275,18 +323,97 @@ class TaskDispatch{
 
   /**
    * 执行本地推理并返回结果
+   * 
+   * 新增功能：集成任务状态跟踪
+   * - 执行前更新状态为 RUNNING_RECEIVED
+   * - 执行成功更新状态为 COMPLETED
+   * - 执行失败更新状态为 FAILED
+   * 
    * @param taskInfo - 包含推理参数的任务信息
    */
   private async executeAndReturn(taskInfo: TaskTransmitData): Promise<void> {
-    const taskQueue = GlobalTaskManager.getQueue();
-    const result = await taskQueue.addTask(taskInfo.params);
+    const taskId = taskInfo.taskId;
+    const scheduler = Scheduler.getInstance();
+    
+    // 更新状态为执行中
+    scheduler.updateReceivedTaskStatus(
+      taskId,
+      TaskScheduleStatus.RUNNING_RECEIVED,
+      '开始执行推理任务'
+    );
+    
+    try {
+      const taskQueue = GlobalTaskManager.getQueue();
+      const result = await taskQueue.addTask(taskInfo.params);
+      
+      // 构建结果数据
+      const taskResTransmitData: TaskResTransmitData = new TaskResTransmitData();
+      taskResTransmitData.taskId = taskId;
+      taskResTransmitData.fromClient = taskInfo.fromClient;
+      taskResTransmitData.toClient = taskInfo.toClient;
+      taskResTransmitData.params = result;
+      taskResTransmitData.timestamp = systemDateTime.getTime(false);
+      
+      // 更新任务状态
+      if (result.success) {
+        scheduler.updateReceivedTaskStatus(
+          taskId,
+          TaskScheduleStatus.COMPLETED,
+          '推理任务执行成功',
+          result,
+          undefined
+        );
+      } else {
+        const errorMsg = result.message || '推理任务执行失败';
+        scheduler.updateReceivedTaskStatus(
+          taskId,
+          TaskScheduleStatus.FAILED,
+          `推理任务执行失败: ${errorMsg}`,
+          result,
+          errorMsg
+        );
+      }
+      
+      // 发送结果给请求方
+      this.sendTaskResult(taskResTransmitData);
+      
+    } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : String(error);
+      console.error(`[HarmonyInference] [TaskDispatch] 推理任务执行异常: ${errorMsg}`);
+      
+      // 更新状态为失败
+      scheduler.updateReceivedTaskStatus(
+        taskId,
+        TaskScheduleStatus.FAILED,
+        `推理任务执行异常: ${errorMsg}`,
+        undefined,
+        errorMsg
+      );
+      
+      // 发送失败结果给请求方
+      this.sendFailureResult(taskInfo, `推理任务执行异常: ${errorMsg}`);
+    }
+  }
+  
+  /**
+   * 发送失败结果给请求方
+   * 当任务接收或执行失败时，通知请求方任务失败
+   * @param taskInfo - 任务信息
+   * @param errorMessage - 错误信息
+   */
+  private sendFailureResult(taskInfo: TaskTransmitData, errorMessage: string): void {
     const taskResTransmitData: TaskResTransmitData = new TaskResTransmitData();
     taskResTransmitData.taskId = taskInfo.taskId;
     taskResTransmitData.fromClient = taskInfo.fromClient;
     taskResTransmitData.toClient = taskInfo.toClient;
-    taskResTransmitData.params = result;
+    taskResTransmitData.params = {
+      success: false,
+      message: errorMessage
+    };
     taskResTransmitData.timestamp = systemDateTime.getTime(false);
+    
     this.sendTaskResult(taskResTransmitData);
+    console.info(`[HarmonyInference] [TaskDispatch] 已发送失败结果给请求方，任务ID: ${taskInfo.taskId}`);
   }
   
   /**

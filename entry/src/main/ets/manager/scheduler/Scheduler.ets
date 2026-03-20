@@ -37,7 +37,11 @@ export enum TaskScheduleStatus {
   /** 任务已取消 */
   CANCELLED = 'cancelled',
   /** 任务等待重试 */
-  RETRYING = 'retrying'
+  RETRYING = 'retrying',
+  /** 任务已接收（来自远程设备），等待执行 */
+  RECEIVED = 'received',
+  /** 正在执行接收的任务 */
+  RUNNING_RECEIVED = 'running_received'
 }
 
 /**
@@ -105,6 +109,12 @@ export interface TaskTransitionRecord {
 }
 
 /**
+ * 任务来源类型
+ * 区分任务是本地发起还是远程接收
+ */
+export type TaskSourceType = 'local' | 'remote';
+
+/**
  * 调度器任务状态信息
  * 扩展基础 TaskStatus，增加调度相关的状态信息
  */
@@ -135,6 +145,12 @@ export interface SchedulerTaskStatus {
   lastFailureType?: SchedulerFailureType;
   /** 原始任务数据（用于重试） */
   originalTask?: InferenceTask;
+  /** 任务来源类型：local-本地发起，remote-远程接收 */
+  taskSource: TaskSourceType;
+  /** 来源设备标识（仅远程接收任务有值） */
+  sourceDevice?: string;
+  /** 任务接收时间（仅远程接收任务有值） */
+  receivedAt?: number;
 }
 
 /**
@@ -352,7 +368,8 @@ class Scheduler{
       maxRetries: this.retryConfig.maxRetries,
       lastFailureReason: existingStatus ? existingStatus.lastFailureReason : undefined,
       lastFailureType: existingStatus ? existingStatus.lastFailureType : undefined,
-      originalTask: taskCopy || existingStatus?.originalTask  // 优先使用新传入的任务
+      originalTask: taskCopy || existingStatus?.originalTask,  // 优先使用新传入的任务
+      taskSource: existingStatus ? existingStatus.taskSource : 'local'  // 本地发起的任务
     };
     
     // // 添加状态流转记录
@@ -569,6 +586,130 @@ class Scheduler{
     const result: SchedulerTaskStatus[] = [];
     this.taskStatusMap.forEach((taskStatus) => {
       if (taskStatus.status === status) {
+        result.push(taskStatus);
+      }
+    });
+    return result;
+  }
+
+  // ####----------------------------------@接收任务状态管理@----------------------------------####
+
+  /**
+   * 初始化接收任务状态
+   * 当收到远程设备发送的任务时调用，创建接收任务的状态记录
+   * @param taskId - 任务唯一标识
+   * @param sourceDevice - 任务来源设备标识
+   * @param task - 原始任务数据（可选）
+   * @returns 创建的任务状态对象
+   */
+  public initReceivedTaskStatus(taskId: string, sourceDevice: string, task?: InferenceTask): SchedulerTaskStatus {
+    const now = systemDateTime.getTime(false);
+    const ownDeviceId: string = getDeviceId();
+    
+    // 深拷贝任务数据
+    const taskCopy: InferenceTask | undefined = task ? this.deepCopyTask(task) : undefined;
+    
+    const status: SchedulerTaskStatus = {
+      taskId: taskId,
+      status: TaskScheduleStatus.RECEIVED,
+      createdAt: now,
+      updatedAt: now,
+      targetNode: ownDeviceId,  // 接收任务在本设备执行
+      transitionHistory: [{
+        timestamp: now,
+        status: TaskScheduleStatus.RECEIVED,
+        node: ownDeviceId,
+        message: `收到来自设备 ${sourceDevice} 的任务`
+      }],
+      retryCount: 0,
+      maxRetries: this.retryConfig.maxRetries,
+      originalTask: taskCopy,
+      taskSource: 'remote',
+      sourceDevice: sourceDevice,
+      receivedAt: now
+    };
+    
+    this.taskStatusMap.set(taskId, status);
+    this.notifyStatusChange(taskId, status);
+    console.info(`[HarmonyInference] [Scheduler] 初始化接收任务状态: ${taskId}, 来源: ${sourceDevice}`);
+    return status;
+  }
+
+  /**
+   * 更新接收任务执行状态
+   * @param taskId - 任务唯一标识
+   * @param newStatus - 新状态
+   * @param message - 状态变更说明
+   * @param result - 执行结果（完成时填充）
+   * @param error - 错误信息（失败时填充）
+   */
+  public updateReceivedTaskStatus(
+    taskId: string,
+    newStatus: TaskScheduleStatus,
+    message?: string,
+    result?: InferenceResult,
+    error?: string
+  ): void {
+    const status = this.taskStatusMap.get(taskId);
+    if (!status) {
+      console.warn(`[HarmonyInference] [Scheduler] 更新接收任务状态失败，未找到任务: ${taskId}`);
+      return;
+    }
+
+    // 验证是否为接收任务
+    if (status.taskSource !== 'remote') {
+      console.warn(`[HarmonyInference] [Scheduler] 任务 ${taskId} 不是接收任务，请使用 updateLocalTaskStatus`);
+      return;
+    }
+
+    const now = systemDateTime.getTime(false);
+    const ownDeviceId: string = getDeviceId();
+    
+    status.status = newStatus;
+    status.updatedAt = now;
+    
+    if (result !== undefined) {
+      status.result = result;
+    }
+    if (error !== undefined) {
+      status.error = error;
+    }
+
+    // 记录流转历史
+    status.transitionHistory.push({
+      timestamp: now,
+      status: newStatus,
+      node: ownDeviceId,
+      message: message || `状态变更为: ${newStatus}`
+    });
+
+    this.notifyStatusChange(taskId, status);
+    console.info(`[HarmonyInference] [Scheduler] 接收任务状态更新: ${taskId} -> ${newStatus}`);
+  }
+
+  /**
+   * 获取所有接收的任务列表
+   * @returns 所有来源为 remote 的任务状态数组
+   */
+  public getReceivedTasks(): SchedulerTaskStatus[] {
+    const result: SchedulerTaskStatus[] = [];
+    this.taskStatusMap.forEach((taskStatus) => {
+      if (taskStatus.taskSource === 'remote') {
+        result.push(taskStatus);
+      }
+    });
+    return result;
+  }
+
+  /**
+   * 获取指定来源设备的任务列表
+   * @param sourceDevice - 来源设备标识
+   * @returns 符合条件的任务状态数组
+   */
+  public getTasksBySourceDevice(sourceDevice: string): SchedulerTaskStatus[] {
+    const result: SchedulerTaskStatus[] = [];
+    this.taskStatusMap.forEach((taskStatus) => {
+      if (taskStatus.sourceDevice === sourceDevice) {
         result.push(taskStatus);
       }
     });

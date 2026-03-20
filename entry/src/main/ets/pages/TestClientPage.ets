@@ -228,9 +228,12 @@ export struct TestClientPage {
         return 40;
       case TaskScheduleStatus.RUNNING_LOCAL:
       case TaskScheduleStatus.RUNNING_REMOTE:
+      case TaskScheduleStatus.RUNNING_RECEIVED:
         return 70;
       case TaskScheduleStatus.RETRYING:
         return 50;
+      case TaskScheduleStatus.RECEIVED:
+        return 30;
       case TaskScheduleStatus.COMPLETED:
         return 100;
       case TaskScheduleStatus.FAILED:
@@ -250,6 +253,8 @@ export struct TestClientPage {
       [TaskScheduleStatus.DISPATCHED, '已分发到远程节点'],
       [TaskScheduleStatus.RUNNING_LOCAL, '本地执行中'],
       [TaskScheduleStatus.RUNNING_REMOTE, '远程执行中'],
+      [TaskScheduleStatus.RUNNING_RECEIVED, '执行接收任务中'],
+      [TaskScheduleStatus.RECEIVED, '已接收任务'],
       [TaskScheduleStatus.COMPLETED, '执行完成'],
       [TaskScheduleStatus.FAILED, '执行失败'],
       [TaskScheduleStatus.CANCELLED, '已取消'],
@@ -268,11 +273,13 @@ export struct TestClientPage {
         return '#ff4d4f';
       case TaskScheduleStatus.RUNNING_LOCAL:
       case TaskScheduleStatus.RUNNING_REMOTE:
+      case TaskScheduleStatus.RUNNING_RECEIVED:
         return '#1890ff';
       case TaskScheduleStatus.RETRYING:
         return '#faad14';
       case TaskScheduleStatus.PENDING:
       case TaskScheduleStatus.SCHEDULING:
+      case TaskScheduleStatus.RECEIVED:
         return '#bfbfbf';
       default:
         return '#8c8c8c';
