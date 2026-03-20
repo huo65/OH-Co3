@@ -217,6 +217,7 @@ class TaskDispatch{
    * - 大文件传输（tcp 或其他协议）：委托 FileTransferManager 建立连接并接收文件，再执行推理
    * @param message - 接收到的任务消息 JSON 字符串
    */
+  // TODO 收到远程任务的处理日志
   async parseTaskMessage(message: string) {
     const taskInfo: TaskTransmitData = JSON.parse(message);
     console.info(`[HarmonyInference] [TaskDispatch] 收到任务消息，任务ID: ${taskInfo.taskId}`);

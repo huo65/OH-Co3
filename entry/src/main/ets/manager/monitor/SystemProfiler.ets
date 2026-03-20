@@ -63,7 +63,8 @@ class SystemProfiler{
 
     return combinedInfo;
   }
-
+  // 设备清理机制已由 NodeInfoSyn.parseDeviceListMessage 实现
+  // 通过接收 "/device/list" 主题的在线设备列表，自动清理离线设备
   getOtherInfo():HashMap<string,DeviceInfo>{
     return nodeInfoSyn.getOtherNodeInfo()
   }

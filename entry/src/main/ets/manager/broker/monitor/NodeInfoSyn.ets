@@ -28,6 +28,14 @@ interface LatencyInfoObj {
 }
 
 /**
+ * 在线设备列表对象接口
+ * 用于解析在线设备列表消息
+ */
+interface DeviceListObj {
+  aliveDevice: string[];
+}
+
+/**
  * 节点信息同步类
  * 管理设备网络中的节点信息，处理节点信息的发送与接收
  * 使用统一的设备标识管理模块获取本设备标识
@@ -109,7 +117,7 @@ class NodeInfoSyn{
           latency: parseFloat(params.latency.toFixed(2))
         };
         this.otherNodeInfo = this.otherNodeInfo.filter(node => node.deviceName !== newDeviceName);
-        console.info(`[HarmonyInference] [NodeInfoSyn] 新设备节点加入网络: ${newDeviceName}`);
+        // console.info(`[HarmonyInference] [NodeInfoSyn] 新设备节点加入网络: ${newDeviceName}`);
 
         this.otherNodeInfo.push(newNodeInfo);
       } else {
@@ -157,12 +165,64 @@ class NodeInfoSyn{
         this.lastLatency = latency;
         console.info(`[HarmonyInference] [NodeInfoSyn] 网络延迟测试完成: ${latency}ms`);
       } else {
-        console.info(`[HarmonyInference] [NodeInfoSyn] 忽略其他设备的延迟测试响应，来源: ${objDeviceName}`);
+        // console.info(`[HarmonyInference] [NodeInfoSyn] 忽略其他设备的延迟测试响应，来源: ${objDeviceName}`);
       }
     } catch (e) {
       console.error(`[HarmonyInference] [NodeInfoSyn] 解析延迟测试消息失败: ${e}`);
     }
     return 0;
+  }
+
+  /**
+   * 解析在线设备列表消息
+   * 根据在线设备列表清理已离线的设备信息
+   * @param message 接收到的在线设备列表消息
+   * 消息格式示例：
+   * {
+   *   "aliveDevice": ["OH-RockchipRK366-3ea84890", "OH-RockchipRK366-8ce6f84e", "test1"]
+   * }
+   */
+  parseDeviceListMessage(message: string): void {
+    try {
+      const deviceListObj: DeviceListObj = JSON.parse(message);
+      const aliveDevices: string[] = deviceListObj.aliveDevice;
+      const ownDeviceId: string = getDeviceId();
+
+      if (!aliveDevices || !Array.isArray(aliveDevices)) {
+        console.warn(`[HarmonyInference] [NodeInfoSyn] 在线设备列表格式无效`);
+        return;
+      }
+
+      // 创建在线设备集合，便于快速查找
+      const aliveDeviceSet = new Set<string>(aliveDevices);
+
+      // 记录清理前的设备数量
+      const beforeCount = this.otherNodeInfo.length;
+
+      // 过滤掉不在在线列表中的设备
+      this.otherNodeInfo = this.otherNodeInfo.filter(node => {
+        const isAlive = aliveDeviceSet.has(node.deviceName);
+        if (!isAlive) {
+          console.info(`[HarmonyInference] [NodeInfoSyn] 清理离线设备: ${node.deviceName}`);
+        }
+        return isAlive;
+      });
+
+      const cleanedCount = beforeCount - this.otherNodeInfo.length;
+      if (cleanedCount > 0) {
+        console.info(`[HarmonyInference] [NodeInfoSyn] 设备清理完成，清理数量: ${cleanedCount}，剩余设备: ${this.otherNodeInfo.length}`);
+      }
+    } catch (e) {
+      console.error(`[HarmonyInference] [NodeInfoSyn] 解析在线设备列表消息失败: ${e}`);
+    }
+  }
+
+  /**
+   * 获取当前维护的其他设备数量
+   * @returns 其他设备数量
+   */
+  getOtherDeviceCount(): number {
+    return this.otherNodeInfo.length;
   }
 }
 export const nodeInfoSyn = new NodeInfoSyn();

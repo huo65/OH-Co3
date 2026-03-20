@@ -125,6 +125,9 @@ class HarmonyInferenceClient {
         if (realMessage.topic == "/device/status") {
           nodeInfoSyn.parseNodeInfoMessage(realMessage.content);
         }
+        if (realMessage.topic == "/device/list") {
+          nodeInfoSyn.parseDeviceListMessage(realMessage.content);
+        }
         if (realMessage.topic == "/test/latency") {
           nodeInfoSyn.testLatencyRec(realMessage.content);
         }
