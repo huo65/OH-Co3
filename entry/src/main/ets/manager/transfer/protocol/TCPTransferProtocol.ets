@@ -248,6 +248,38 @@ export class TCPTransferProtocol implements CapableProtocolInterface {
   }
 
   /**
+   * 清理任务相关资源
+   * 在任务完成、失败或取消时调用，确保内存及时释放
+   * @param taskId - 任务ID
+   */
+  private cleanupTaskResources(taskId: string): void {
+    // 清理分块缓冲区
+    this.chunkBuffers.delete(taskId);
+
+    // 清理接收状态（包括超时定时器）
+    const receiveState = this.receiveStates.get(taskId);
+    if (receiveState) {
+      if (receiveState.timeoutId !== undefined) {
+        clearTimeout(receiveState.timeoutId);
+      }
+      this.receiveStates.delete(taskId);
+    }
+
+    // 清理发送状态
+    this.sendStates.delete(taskId);
+
+    // 清理进度信息（延迟清理，允许UI最后更新一次）
+    const progress = this.progressMap.get(taskId);
+    if (progress) {
+      setTimeout(() => {
+        this.progressMap.delete(taskId);
+      }, 60000);
+    }
+
+    console.info(`[HarmonyInference] [TCPTransferProtocol] 任务资源已清理，taskId=${taskId}`);
+  }
+
+  /**
    * 发送文件数据（支持分块传输）
    */
   async send(data: ArrayBuffer | string, taskId: string, config?: TransferConfig): Promise<TransferResult<boolean>> {
@@ -434,8 +466,8 @@ export class TCPTransferProtocol implements CapableProtocolInterface {
       // 更新进度为完成
       this.updateProgress(taskId, TransferState.COMPLETED, 100, fileData.byteLength, fileData.byteLength);
 
-      // 清理发送状态
-      this.sendStates.delete(taskId);
+      // 使用统一的资源清理方法
+      this.cleanupTaskResources(taskId);
 
       console.info(`[HarmonyInference] [TCPTransferProtocol] 文件发送完成，任务ID: ${taskId}`);
       return createSuccessResult(taskId, true);
@@ -443,7 +475,7 @@ export class TCPTransferProtocol implements CapableProtocolInterface {
       const transferError = errorFromException(error, TransferErrorCode.TRANSFER_FAILED);
       console.error(`[HarmonyInference] [TCPTransferProtocol] 文件发送失败: ${transferError.message}`);
       this.updateProgress(taskId, TransferState.FAILED, 0, 0, 0, undefined, undefined, transferError.message);
-      this.sendStates.delete(taskId);
+      this.cleanupTaskResources(taskId);
 
       return createErrorResult(
         taskId,
@@ -503,9 +535,8 @@ export class TCPTransferProtocol implements CapableProtocolInterface {
       // 更新进度为完成
       this.updateProgress(taskId, TransferState.COMPLETED, 100, fileData.byteLength, fileData.byteLength);
 
-      // 清理接收状态
-      this.receiveStates.delete(taskId);
-      this.chunkBuffers.delete(taskId);
+      // 使用统一的资源清理方法
+      this.cleanupTaskResources(taskId);
 
       return createSuccessResult(taskId, fileData);
     } catch (error) {
@@ -515,7 +546,7 @@ export class TCPTransferProtocol implements CapableProtocolInterface {
 
       // 清理资源
       this.socketManager.unregisterMessageCallback(taskId);
-      this.receiveStates.delete(taskId);
+      this.cleanupTaskResources(taskId);
 
       return createErrorResult(
         taskId,
@@ -550,15 +581,13 @@ export class TCPTransferProtocol implements CapableProtocolInterface {
   async cancel(taskId: string): Promise<TransferResult<boolean>> {
     console.info(`[HarmonyInference] [TCPTransferProtocol] 取消传输任务，任务ID: ${taskId}`);
 
-    // 清理该任务的缓存
-    this.chunkBuffers.delete(taskId);
-    this.sendStates.delete(taskId);
-
     const receiveState = this.receiveStates.get(taskId);
     if (receiveState && receiveState.reject) {
       receiveState.reject(new Error('传输已取消'));
     }
-    this.receiveStates.delete(taskId);
+
+    // 使用统一的资源清理方法
+    this.cleanupTaskResources(taskId);
 
     this.updateProgress(taskId, TransferState.CANCELLED, 0, 0, 0);
 
@@ -809,6 +838,12 @@ export class TCPTransferProtocol implements CapableProtocolInterface {
 
     console.info(`[HarmonyInference] [TCPTransferProtocol] 完成消息已接收，任务ID: ${taskId}`);
 
+    // 清理超时定时器，防止资源泄漏
+    if (receiveState.timeoutId !== undefined) {
+      clearTimeout(receiveState.timeoutId);
+      receiveState.timeoutId = undefined;
+    }
+
     if (receiveState.resolve) {
       receiveState.resolve(receiveState.chunks);
     }
@@ -821,13 +856,22 @@ export class TCPTransferProtocol implements CapableProtocolInterface {
     console.error(`[HarmonyInference] [TCPTransferProtocol] 收到错误消息，任务ID: ${taskId}，错误信息: ${message.errorMessage}`);
 
     const receiveState = this.receiveStates.get(taskId);
-    if (receiveState && receiveState.reject) {
-      receiveState.reject(new Error(message.errorMessage));
+    if (receiveState) {
+      // 清理超时定时器，防止资源泄漏
+      if (receiveState.timeoutId !== undefined) {
+        clearTimeout(receiveState.timeoutId);
+        receiveState.timeoutId = undefined;
+      }
+
+      if (receiveState.reject) {
+        receiveState.reject(new Error(message.errorMessage));
+      }
     }
   }
 
   /**
    * 等待所有分块接收完成
+   * 使用 Promise + 事件驱动机制，避免轮询开销
    */
   private async waitForAllChunks(taskId: string): Promise<ChunkData[]> {
     return new Promise((resolve, reject) => {
@@ -837,15 +881,41 @@ export class TCPTransferProtocol implements CapableProtocolInterface {
         return;
       }
 
+      // 如果已经完成，直接返回结果
       if (receiveState.isComplete) {
         resolve(receiveState.chunks);
         return;
       }
 
-      receiveState.resolve = resolve;
-      receiveState.reject = reject;
+      // 存储 Promise 的 resolve/reject 到状态中
+      // 当收到完成消息或错误消息时，会通过事件驱动调用这些回调
+      receiveState.resolve = (chunks: ChunkData[]) => {
+        // 清理超时定时器
+        if (receiveState.timeoutId !== undefined) {
+          clearTimeout(receiveState.timeoutId);
+          receiveState.timeoutId = undefined;
+        }
+        resolve(chunks);
+      };
 
+      receiveState.reject = (error: Error) => {
+        // 清理超时定时器
+        if (receiveState.timeoutId !== undefined) {
+          clearTimeout(receiveState.timeoutId);
+          receiveState.timeoutId = undefined;
+        }
+        reject(error);
+      };
+
+      // 设置超时保护
       receiveState.timeoutId = setTimeout(() => {
+        // 超时后清理状态并拒绝 Promise
+        if (receiveState.timeoutId !== undefined) {
+          clearTimeout(receiveState.timeoutId);
+          receiveState.timeoutId = undefined;
+        }
+        receiveState.resolve = undefined;
+        receiveState.reject = undefined;
         reject(new Error('接收分块超时'));
       }, this.RECEIVE_TIMEOUT);
     });

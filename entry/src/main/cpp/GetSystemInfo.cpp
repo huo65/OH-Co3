@@ -5,7 +5,7 @@
 #include <chrono>
 #include <thread>
 
-const char *TAG = "[Sample_rawfile]";
+const char *TAG = "[GetSystemInfo]";
 
 napi_value GetSystemInfo::GetCpuUsage(napi_env env, napi_callback_info info)
 {
@@ -60,12 +60,10 @@ std::string GetSystemInfo::getCpuStatLine(const std::string& field)
     std::string line;
     while (getline(cpuInfo, line)) {
         if (line.find(field) == 0) {
-            cpuInfo.close();
             return line;
         }
     }
     
-    cpuInfo.close();
     return "";
 }
 
@@ -120,13 +118,20 @@ long long GetSystemInfo::parseMemoryValue(const std::string& line)
     std::string key, value, unit;
     iss >> key >> value >> unit;
     
-    long long memValue = std::stoll(value);
-    // 将kB转换为bytes
-    if (unit == "kB") {
-        memValue *= 1024;
+    try {
+        long long memValue = std::stoll(value);
+        // 将kB转换为bytes
+        if (unit == "kB") {
+            memValue *= 1024;
+        }
+        return memValue;
+    } catch (const std::invalid_argument& e) {
+        LOGE("Invalid memory value format: %s, error: %s", value.c_str(), e.what());
+        return 0;
+    } catch (const std::out_of_range& e) {
+        LOGE("Memory value out of range: %s, error: %s", value.c_str(), e.what());
+        return 0;
     }
-    
-    return memValue;
 }
 
 void GetSystemInfo::parseMemInfo(long long& memTotal, long long& memAvailable)
@@ -155,8 +160,6 @@ void GetSystemInfo::parseMemInfo(long long& memTotal, long long& memAvailable)
             break;
         }
     }
-    
-    meminfo.close();
 }
 
 double GetSystemInfo::calculateMemUsage()
